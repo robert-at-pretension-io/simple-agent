@@ -30,11 +30,11 @@ type ChatCompletionRequest struct {
 }
 
 type Message struct {
-	Role         string           `json:"role"`
-	Content      string           `json:"content,omitempty"`
-	ToolCalls    []ToolCall       `json:"tool_calls,omitempty"`
-	ToolCallID   string           `json:"tool_call_id,omitempty"`
-	ExtraContent json.RawMessage  `json:"extra_content,omitempty"`
+	Role         string          `json:"role"`
+	Content      string          `json:"content,omitempty"`
+	ToolCalls    []ToolCall      `json:"tool_calls,omitempty"`
+	ToolCallID   string          `json:"tool_call_id,omitempty"`
+	ExtraContent json.RawMessage `json:"extra_content,omitempty"`
 }
 
 type Tool struct {
@@ -185,7 +185,7 @@ type Skill struct {
 var skillsExplanation = `
 # Skills System Philosophy
 
-You have the ability to discover and use "Skills". Skills are specialized capabilities defined in files within the 'skills' directory.
+You have the ability to discover, create and use "Skills". Skills are specialized capabilities defined in files within the 'skills' directory.
 
 ## Purpose
 Skills bridge the gap between general reasoning and specific, repeatable tasks. They allow you to:
