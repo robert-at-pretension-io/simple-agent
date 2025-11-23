@@ -634,7 +634,7 @@ When using 'apply_udiff', provide a unified diff.
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
 							fmt.Printf("Executing script: %s %v\n", args.Path, args.Args)
-							toolResult, toolErr = runSafeScript(args.Path, args.Args)
+							toolResult, toolErr = runSafeScript(args.Path, args.Args, skillsPrompt)
 						}
 
 					case "list_files":
@@ -727,6 +727,7 @@ When using 'apply_udiff', provide a unified diff.
 
 				if len(newSkills) > 0 {
 					skills = currentSkills // Update main skills list
+					skillsPrompt = generateSkillsPrompt(skills)
 
 					var sb strings.Builder
 					sb.WriteString("SYSTEM NOTICE: New skills discovered:\n")
@@ -858,20 +859,20 @@ func execShellCommand(command string) (string, error) {
 	return string(out), nil
 }
 
-func runSafeScript(scriptPath string, args []string) (string, error) {
+func runSafeScript(scriptPath string, args []string, skillsPrompt string) (string, error) {
 	// Validate path
 	absPath, err := validatePath(scriptPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w\n\nREMINDER: run_script can only execute scripts defined within the 'skills' directory.\n%s", err, skillsPrompt)
 	}
 
 	// Check if file exists
 	info, err := os.Stat(absPath)
 	if err != nil {
-		return "", fmt.Errorf("script not found: %w", err)
+		return "", fmt.Errorf("script not found: %w\n\nREMINDER: run_script can only execute scripts defined within the 'skills' directory.\n%s", err, skillsPrompt)
 	}
 	if info.IsDir() {
-		return "", fmt.Errorf("path is a directory, not a file")
+		return "", fmt.Errorf("path is a directory, not a file\n\nREMINDER: run_script can only execute scripts defined within the 'skills' directory.\n%s", skillsPrompt)
 	}
 
 	// Check if it is inside a "scripts" folder within "skills"
@@ -879,14 +880,14 @@ func runSafeScript(scriptPath string, args []string) (string, error) {
 	skillsDir := filepath.Join(cwd, "skills")
 
 	if !strings.HasPrefix(absPath, skillsDir) {
-		return "", fmt.Errorf("script must be inside the 'skills' directory")
+		return "", fmt.Errorf("script must be inside the 'skills' directory.\n%s", skillsPrompt)
 	}
 
 	// Check for 'scripts' in the path components
 	// We use string(os.PathSeparator) to be cross-platform
 	sep := string(os.PathSeparator)
 	if !strings.Contains(absPath, sep+"scripts"+sep) {
-		return "", fmt.Errorf("script must be inside a 'scripts' folder")
+		return "", fmt.Errorf("script must be inside a 'scripts' folder.\n%s", skillsPrompt)
 	}
 
 	// Determine execution method
