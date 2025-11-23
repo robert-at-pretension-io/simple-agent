@@ -539,6 +539,7 @@ func main() {
 When using 'apply_udiff', provide a unified diff.
 - Start hunks with '@@ ... @@'
 - Use ' ' for context, '-' for removal, '+' for addition.
+- **ALWAYS** include at least 2 lines of context around your changes.
 - Do not include line numbers in the hunk header.
 - Ensure enough context is provided to uniquely locate the code.
 - Replace entire blocks/functions rather than small internal edits to ensure uniqueness.
@@ -1252,6 +1253,11 @@ func applyUDiff(ctx context.Context, path string, diff string, dryRun bool) (str
 		if len(hunk.SearchLines) == 0 && content == "" {
 			newContent = replaceBlock
 			continue
+		}
+
+		// Check for pure insertion without context in existing file
+		if len(hunk.SearchLines) == 0 && content != "" {
+			return "", fmt.Errorf("hunk %d failed to apply: pure insertion (no context lines) is not allowed in existing file.\nPlease provide at least 2 lines of context (' ') around the new code to uniquely locate the insertion point.", i+1)
 		}
 
 		// Check if search block exists
