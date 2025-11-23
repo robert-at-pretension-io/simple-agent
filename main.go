@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -133,6 +134,45 @@ var runScriptTool = Tool{
 	},
 }
 
+var listFilesTool = Tool{
+	Type: "function",
+	Function: FunctionDefinition{
+		Name:        "list_files",
+		Description: "List files and directories at a given path.",
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"path": {
+					"type": "string",
+					"description": "The directory path to list (default: .)"
+				}
+			}
+		}`),
+	},
+}
+
+var searchFilesTool = Tool{
+	Type: "function",
+	Function: FunctionDefinition{
+		Name:        "search_files",
+		Description: "Search for a text pattern in files within a directory.",
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"path": {
+					"type": "string",
+					"description": "The directory path to search in (default: .)"
+				},
+				"regex": {
+					"type": "string",
+					"description": "The regular expression pattern to search for"
+				}
+			},
+			"required": ["regex"]
+		}`),
+	},
+}
+
 // --- Skills System ---
 
 type Skill struct {
@@ -141,6 +181,34 @@ type Skill struct {
 	Path           string
 	DefinitionFile string
 }
+
+var skillsExplanation = `
+# Skills System Philosophy
+
+You have the ability to discover and use "Skills". Skills are specialized capabilities defined in files within the 'skills' directory.
+
+## Purpose
+Skills bridge the gap between general reasoning and specific, repeatable tasks. They allow you to:
+1.  **Extend Capabilities**: Learn new workflows (e.g., "deploy to AWS", "audit code") without core updates.
+2.  **Encapsulate Logic**: Hide complex details in scripts and instructions.
+3.  **Autonomy**: You read the "manual" (SKILL.md) and drive execution.
+
+## How to Invoke Skills
+1.  **Discover**: The system provides a list of available skills.
+2.  **Learn**: If a user request matches a skill, use 'read_file' to read its 'SKILL.md'.
+3.  **Execute**: Follow the instructions in 'SKILL.md', often using 'run_script' to execute provided scripts.
+
+## Creating and Managing Skills
+You can also create new skills to solve problems!
+- **Specific vs. General**: Create specific skills for complex, recurring problems. However, prefer general skills that can be reused.
+- **Auditing**: If you find too many specific skills cluttering the system, suggest consolidating them or removing obsolete ones.
+- **Best Practices**:
+    - **Concise**: Only add necessary context.
+    - **Scripts**: Prefer writing utility scripts (e.g., Python, Bash) over asking for manual execution steps.
+    - **Self-Contained**: A skill should include everything needed to run it (scripts, instructions).
+
+When faced with a new, complex task that might be repeated, consider creating a new skill for it.
+`
 
 func discoverSkills(root string) []Skill {
 	var skills []Skill
@@ -243,7 +311,7 @@ func main() {
 	skillsPrompt := generateSkillsPrompt(skills)
 
 	baseSystemPrompt := `Act as an expert software developer.
-You have access to tools to edit files, read files, and execute scripts.
+You have access to tools to edit files, read files, list files, search files, and execute scripts.
 When using 'apply_udiff', provide a unified diff.
 - Start hunks with '@@ ... @@'
 - Use ' ' for context, '-' for removal, '+' for addition.
@@ -252,7 +320,7 @@ When using 'apply_udiff', provide a unified diff.
 - Replace entire blocks/functions rather than small internal edits to ensure uniqueness.
 - If a file does not exist, treat it as empty for the 'before' state.
 `
-	systemPrompt := baseSystemPrompt + skillsPrompt
+	systemPrompt := baseSystemPrompt + skillsExplanation + skillsPrompt
 
 	messages := []Message{
 		{
@@ -290,7 +358,7 @@ When using 'apply_udiff', provide a unified diff.
 			reqBody := ChatCompletionRequest{
 				Model:     ModelName,
 				Messages:  messages,
-				Tools:     []Tool{udiffTool, readFileTool, runScriptTool},
+				Tools:     []Tool{udiffTool, readFileTool, runScriptTool, listFilesTool, searchFilesTool},
 				ExtraBody: json.RawMessage(`{"google": {"thinking_config": {"include_thoughts": true}}}`),
 			}
 
@@ -397,6 +465,31 @@ When using 'apply_udiff', provide a unified diff.
 							toolResult, toolErr = runScript(args.Command)
 						}
 
+					case "list_files":
+						fmt.Printf("[Tool Call: list_files]\n")
+						var args struct {
+							Path string `json:"path"`
+						}
+						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+							toolErr = fmt.Errorf("error parsing arguments: %v", err)
+						} else {
+							fmt.Printf("Listing files in: %s\n", args.Path)
+							toolResult, toolErr = listFiles(args.Path)
+						}
+
+					case "search_files":
+						fmt.Printf("[Tool Call: search_files]\n")
+						var args struct {
+							Path  string `json:"path"`
+							Regex string `json:"regex"`
+						}
+						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+							toolErr = fmt.Errorf("error parsing arguments: %v", err)
+						} else {
+							fmt.Printf("Searching files in %s for: %s\n", args.Path, args.Regex)
+							toolResult, toolErr = searchFiles(args.Path, args.Regex)
+						}
+
 					default:
 						toolErr = fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
 					}
@@ -443,6 +536,82 @@ func runScript(command string) (string, error) {
 		return string(out), fmt.Errorf("command failed: %w\nOutput:\n%s", err, string(out))
 	}
 	return string(out), nil
+}
+
+func listFiles(path string) (string, error) {
+	if path == "" {
+		path = "."
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to list directory: %w", err)
+	}
+	var sb strings.Builder
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		suffix := ""
+		if entry.IsDir() {
+			suffix = "/"
+		}
+		sb.WriteString(fmt.Sprintf("%s%s (%d bytes)\n", entry.Name(), suffix, info.Size()))
+	}
+	return sb.String(), nil
+}
+
+func searchFiles(root string, pattern string) (string, error) {
+	if root == "" {
+		root = "."
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return "", fmt.Errorf("invalid regex: %w", err)
+	}
+	var sb strings.Builder
+	matchCount := 0
+
+	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules" {
+				return fs.SkipDir
+			}
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		lines := strings.Split(string(content), "\n")
+		for i, line := range lines {
+			if re.MatchString(line) {
+				sb.WriteString(fmt.Sprintf("%s:%d: %s\n", path, i+1, strings.TrimSpace(line)))
+				matchCount++
+				if matchCount > 100 {
+					return fmt.Errorf("too many matches")
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil && err.Error() != "too many matches" {
+		return "", fmt.Errorf("search failed: %w", err)
+	}
+
+	if matchCount == 0 {
+		return "No matches found.", nil
+	}
+	if matchCount > 100 {
+		sb.WriteString("... (results truncated)")
+	}
+	return sb.String(), nil
 }
 
 // applyUDiff applies a unified diff to a file
