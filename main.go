@@ -188,6 +188,32 @@ var searchFilesTool = Tool{
 	},
 }
 
+var shortenContextTool = Tool{
+	Type: "function",
+	Function: FunctionDefinition{
+		Name:        "shorten_context",
+		Description: "Summarize and shorten the conversation context based on the current task and vital information. This resets the conversation history with the summary.",
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"task_description": {
+					"type": "string",
+					"description": "Description of the current task being worked on."
+				},
+				"future_plans": {
+					"type": "string",
+					"description": "What needs to be done in the future of this session."
+				},
+				"vital_information": {
+					"type": "string",
+					"description": "Specific information, constraints, or code snippets that must be preserved verbatim."
+				}
+			},
+			"required": ["task_description", "future_plans", "vital_information"]
+		}`),
+	},
+}
+
 // --- Skills System ---
 
 type Skill struct {
@@ -456,7 +482,7 @@ When using 'apply_udiff', provide a unified diff.
 			reqBody := ChatCompletionRequest{
 				Model:     ModelName,
 				Messages:  messages,
-				Tools:     []Tool{udiffTool, readFileTool, runScriptTool, listFilesTool, searchFilesTool},
+				Tools:     []Tool{udiffTool, readFileTool, runScriptTool, listFilesTool, searchFilesTool, shortenContextTool},
 				ExtraBody: json.RawMessage(`{"google": {"thinking_config": {"include_thoughts": true}}}`),
 			}
 
@@ -514,6 +540,8 @@ When using 'apply_udiff', provide a unified diff.
 
 			// Print thoughts if present
 			printThought(msg.ExtraContent)
+
+			contextReset := false
 
 			if len(msg.ToolCalls) > 0 {
 				for _, toolCall := range msg.ToolCalls {
@@ -609,6 +637,37 @@ When using 'apply_udiff', provide a unified diff.
 							toolResult, toolErr = searchFiles(args.Path, args.Regex)
 						}
 
+					case "shorten_context":
+						fmt.Printf("[Tool Call: shorten_context]\n")
+						var args struct {
+							Task   string `json:"task_description"`
+							Future string `json:"future_plans"`
+							Vital  string `json:"vital_information"`
+						}
+						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+							toolErr = fmt.Errorf("error parsing arguments: %v", err)
+						} else {
+							fmt.Println("Summarizing context...")
+							summary, err := summarizeContext(apiKey, messages, args.Task, args.Future, args.Vital)
+							if err != nil {
+								toolErr = fmt.Errorf("failed to summarize: %v", err)
+							} else {
+								// Reset context
+								sysMsg := messages[0]
+								messages = []Message{sysMsg}
+								messages = append(messages, Message{
+									Role:    "user",
+									Content: fmt.Sprintf("Context has been shortened. Summary of previous conversation:\n%s", summary),
+								})
+
+								fmt.Println("Context shortened.")
+								fmt.Println("Gemini (Summary):")
+								printMarkdown(summary)
+
+								contextReset = true
+							}
+						}
+
 					default:
 						toolErr = fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
 					}
@@ -625,6 +684,10 @@ When using 'apply_udiff', provide a unified diff.
 						Content:    content,
 						ToolCallID: toolCall.ID,
 					})
+				}
+
+				if contextReset {
+					break
 				}
 
 				// Check for new skills
@@ -655,6 +718,10 @@ When using 'apply_udiff', provide a unified diff.
 
 				// Loop back to send tool outputs to model
 				continue
+			}
+
+			if contextReset {
+				break
 			}
 
 			// No tool calls, just print response
@@ -1049,4 +1116,79 @@ func printMarkdown(content string) {
 
 		fmt.Println(line)
 	}
+}
+
+func summarizeContext(apiKey string, history []Message, task, future, vital string) (string, error) {
+	var historyBuf bytes.Buffer
+	for i, msg := range history {
+		if i == 0 {
+			continue
+		} // Skip system prompt
+		historyBuf.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, msg.Content))
+		if msg.Content == "" && len(msg.ToolCalls) > 0 {
+			historyBuf.WriteString(fmt.Sprintf("%s: [Tool Call: %s]\n", msg.Role, msg.ToolCalls[0].Function.Name))
+		}
+	}
+
+	prompt := fmt.Sprintf(`You are an expert technical assistant.
+The user wants to shorten the conversation context.
+Please summarize the provided conversation history, adhering to the following constraints:
+
+1. **Current Task**: %s
+2. **Future Plans**: %s
+3. **Vital Information**: %s
+
+Ensure the summary is concise but retains all information necessary to continue working on the task and future plans.
+Preserve code snippets or specific data mentioned in "Vital Information".
+
+Conversation History:
+%s
+`, task, future, vital, historyBuf.String())
+
+	reqBody := ChatCompletionRequest{
+		Model: ModelName,
+		Messages: []Message{
+			{Role: "user", Content: prompt},
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", GeminiURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API Error (Status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var chatResp ChatCompletionResponse
+	if err := json.Unmarshal(body, &chatResp); err != nil {
+		return "", fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if len(chatResp.Choices) == 0 {
+		return "", fmt.Errorf("no choices returned from API")
+	}
+
+	return chatResp.Choices[0].Message.Content, nil
 }
