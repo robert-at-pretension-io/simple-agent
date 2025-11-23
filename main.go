@@ -391,6 +391,12 @@ func main() {
 	skills := discoverSkills("./skills")
 	skillsPrompt := generateSkillsPrompt(skills)
 
+	// Track known skills to detect additions
+	knownSkills := make(map[string]bool)
+	for _, s := range skills {
+		knownSkills[s.Name] = true
+	}
+
 	// Run startup hooks
 	runSkillHooks(skills, "startup", nil)
 
@@ -610,6 +616,33 @@ When using 'apply_udiff', provide a unified diff.
 						ToolCallID: toolCall.ID,
 					})
 				}
+
+				// Check for new skills
+				currentSkills := discoverSkills("./skills")
+				var newSkills []Skill
+				for _, s := range currentSkills {
+					if !knownSkills[s.Name] {
+						newSkills = append(newSkills, s)
+						knownSkills[s.Name] = true
+					}
+				}
+
+				if len(newSkills) > 0 {
+					skills = currentSkills // Update main skills list
+
+					var sb strings.Builder
+					sb.WriteString("SYSTEM NOTICE: New skills discovered:\n")
+					for _, s := range newSkills {
+						sb.WriteString(fmt.Sprintf("- %s: %s\n", s.Name, s.Description))
+					}
+
+					messages = append(messages, Message{
+						Role:    "system",
+						Content: sb.String(),
+					})
+					fmt.Println(sb.String()) // Also print to console for user visibility
+				}
+
 				// Loop back to send tool outputs to model
 				continue
 			}
