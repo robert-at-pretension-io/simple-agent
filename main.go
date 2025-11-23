@@ -43,9 +43,10 @@ type FunctionDefinition struct {
 }
 
 type ToolCall struct {
-	ID       string           `json:"id"`
-	Type     string           `json:"type"`
-	Function ToolCallFunction `json:"function"`
+	ID           string           `json:"id"`
+	Type         string           `json:"type"`
+	Function     ToolCallFunction `json:"function"`
+	ExtraContent json.RawMessage  `json:"extra_content,omitempty"`
 }
 
 type ToolCallFunction struct {
