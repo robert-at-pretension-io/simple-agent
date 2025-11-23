@@ -3,7 +3,7 @@ name: complexity-cop
 description: Checks code complexity to prevent unmaintainable code.
 version: 1.0.0
 hooks:
-  post_edit: scripts/check.py
+  post_edit: scripts/wrapper.sh
 ---
 
 # Complexity Cop

@@ -1,4 +1,5 @@
-# Gemini REPL
+
+## License# Gemini REPL
 
 A simple REPL for interacting with Gemini 3.0 Pro Preview using the OpenAI-compatible REST API.
 

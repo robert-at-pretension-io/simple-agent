@@ -14,4 +14,4 @@ Keeps the codebase lean by identifying obsolete code that should be deleted.
 ### `scan.py`
 Scans the project for exported functions (capitalized names in Go) and checks if they are used in other files.
 
-**Usage**: `scripts/scan.py`
+**Usage**: `scripts/wrapper.sh`
