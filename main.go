@@ -560,19 +560,35 @@ When using 'apply_udiff', provide a unified diff.
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
-							// Pre-edit hook
-							runSkillHooks(skills, "pre_edit", map[string]string{"path": args.Path})
+							// Show diff to user
+							fmt.Printf("Proposed changes to %s:\n", args.Path)
+							printColoredDiff(args.Diff)
 
-							toolResult, toolErr = applyUDiff(args.Path, args.Diff)
-							if toolErr == nil {
-								fmt.Printf("Successfully applied diff to %s\n", args.Path)
-								toolResult = "Diff applied successfully."
+							// Ask for confirmation
+							fmt.Print("Apply these changes? [y/N]: ")
+							var confirm string
+							if scanner.Scan() {
+								confirm = scanner.Text()
 							}
 
-							// Post-edit hook
-							hookOut := runSkillHooks(skills, "post_edit", map[string]string{"path": args.Path})
-							if hookOut != "" {
-								toolResult += "\n\n[Hook Output]\n" + hookOut
+							if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
+								// Pre-edit hook
+								runSkillHooks(skills, "pre_edit", map[string]string{"path": args.Path})
+
+								toolResult, toolErr = applyUDiff(args.Path, args.Diff)
+								if toolErr == nil {
+									fmt.Printf("Successfully applied diff to %s\n", args.Path)
+									toolResult = "Diff applied successfully."
+								}
+
+								// Post-edit hook
+								hookOut := runSkillHooks(skills, "post_edit", map[string]string{"path": args.Path})
+								if hookOut != "" {
+									toolResult += "\n\n[Hook Output]\n" + hookOut
+								}
+							} else {
+								fmt.Println("Changes rejected.")
+								toolResult = "User rejected the changes."
 							}
 						}
 
@@ -1115,6 +1131,19 @@ func printMarkdown(content string) {
 		line = regexp.MustCompile("`([^`]+)`").ReplaceAllString(line, cyan+"$1"+reset)
 
 		fmt.Println(line)
+	}
+}
+
+func printColoredDiff(diff string) {
+	lines := strings.Split(diff, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") {
+			fmt.Printf("\033[32m%s\033[0m\n", line)
+		} else if strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "---") {
+			fmt.Printf("\033[31m%s\033[0m\n", line)
+		} else {
+			fmt.Println(line)
+		}
 	}
 }
 
