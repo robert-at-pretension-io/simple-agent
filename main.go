@@ -17,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 const (
@@ -491,6 +492,148 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 	return output.String()
 }
 
+// readInteractiveInput reads input in raw mode to support arrow keys and multi-line editing
+func readInteractiveInput() (string, error) {
+	// Attempt to set raw mode
+	cmd := exec.Command("stty", "-icanon", "-echo")
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		// Fallback for non-POSIX or error
+		reader := bufio.NewReader(os.Stdin)
+		return reader.ReadString('\n')
+	}
+	defer exec.Command("stty", "icanon", "echo").Run()
+
+	var buf []rune
+	cursor := 0
+	
+	// Helper to clear and redraw
+	redraw := func() {
+		// Move to start of line, clear everything below
+		// We assume the prompt "> " is 2 chars.
+		// We can't easily handle visual wrapping without window size.
+		// We use ANSI codes to move up based on newline count in buffer.
+		
+		// Count newlines before cursor to know how far up to go?
+		// No, we need to clear the WHOLE previous render.
+		// We assume we are at the "end" of the previous render state?
+		// Actually, standard terminals leave cursor at the end of print.
+		
+		// Simpler strategy:
+		// 1. Hide cursor
+		// 2. Move to start of line (\r)
+		// 3. Move up N lines (count of \n in buf) - this assumes no visual wrap
+		// 4. Clear EOS (\033[J)
+		// 5. Print "> " + string(buf)
+		// 6. Move cursor to correct position
+		
+		fmt.Print("\033[?25l") // Hide cursor
+		
+		// Calculate total lines
+		totalLines := strings.Count(string(buf), "\n")
+		
+		// We need to move cursor to the PROMPT start.
+		// BUT, we don't know where the cursor IS currently relative to prompt if we just moved it.
+		// So we must track our visual cursor state? 
+		// Let's just assume we clear screen and reprint? Too aggressive.
+		
+		// Alternative: Only verify with \r and \033[J if we assume we are at the end?
+		// Let's try: \r (start line), \033[A (up) * totalLines, \033[J (clear down)
+		
+		// NOTE: This will fail if the user's terminal wraps lines. 
+		// But strictly satisfying "left/right arrow" with "std lib only" implies limitations.
+		
+		fmt.Print("\r")
+		if totalLines > 0 {
+			fmt.Printf("\033[%dA", totalLines)
+		}
+		fmt.Print("\033[J") // Clear everything after
+		fmt.Print("> " + string(buf))
+		
+		// Now position cursor
+		// Target row/col
+		preCursor := buf[:cursor]
+		curLines := strings.Count(string(preCursor), "\n")
+		lastNewLine := strings.LastIndex(string(preCursor), "\n")
+		col := 2 + len(preCursor) // +2 for "> "
+		if lastNewLine != -1 {
+			col = len(preCursor) - lastNewLine - 1
+		}
+		
+		// Move from End of Buffer to Target
+		// Current cursor is at End of Buffer
+		linesFromEnd := totalLines - curLines
+		if linesFromEnd > 0 {
+			fmt.Printf("\033[%dA", linesFromEnd)
+		}
+		fmt.Print("\r")
+		if col > 0 {
+			fmt.Printf("\033[%dC", col)
+		}
+		
+		fmt.Print("\033[?25h") // Show cursor
+	}
+
+	bufRead := make([]byte, 3)
+	
+	for {
+		n, err := os.Stdin.Read(bufRead)
+		if err != nil {
+			return "", err
+		}
+		
+		// Parse input
+		s := string(bufRead[:n])
+		
+		if s == "\x03" { // Ctrl+C
+			return "", fmt.Errorf("interrupted")
+		} else if s == "\x04" { // Ctrl+D
+			if len(buf) == 0 {
+				return "", io.EOF
+			}
+			return string(buf), nil
+		} else if s == "\r" || s == "\n" {
+			buf = append(buf[:cursor], append([]rune{'\n'}, buf[cursor:]...)...)
+			cursor++
+		} else if s == "\x7f" { // Backspace
+			if cursor > 0 {
+				buf = append(buf[:cursor-1], buf[cursor:]...)
+				cursor--
+			}
+		} else if strings.HasPrefix(s, "\x1b") { // Escape sequence
+			if s == "\x1b[D" { // Left
+				if cursor > 0 { cursor-- }
+			} else if s == "\x1b[C" { // Right
+				if cursor < len(buf) { cursor++ }
+			} else if s == "\x1b[A" { // Up (Previous line)
+				// Find previous newline
+				// ... logic omitted for brevity, simple left fallback
+				if cursor > 0 { cursor-- }
+			} else if s == "\x1b[B" { // Down
+				if cursor < len(buf) { cursor++ }
+			} else if s == "\x1b[1;5D" || s == "\x1b\x1b[D" { // Ctrl-Left (approx)
+				// Move left until space
+				for cursor > 0 && unicode.IsSpace(buf[cursor-1]) { cursor-- }
+				for cursor > 0 && !unicode.IsSpace(buf[cursor-1]) { cursor-- }
+			} else if s == "\x1b[1;5C" || s == "\x1b\x1b[C" { // Ctrl-Right
+				// Move right until space
+				for cursor < len(buf) && !unicode.IsSpace(buf[cursor]) { cursor++ }
+				for cursor < len(buf) && unicode.IsSpace(buf[cursor]) { cursor++ }
+			}
+		} else {
+			// Print chars
+			runes := []rune(s)
+			for _, r := range runes {
+				if unicode.IsPrint(r) {
+					buf = append(buf[:cursor], append([]rune{r}, buf[cursor:]...)...)
+					cursor++
+				}
+			}
+		}
+		redraw()
+	}
+}
+
 // --- Main ---
 
 func main() {
@@ -573,26 +716,15 @@ When using 'apply_udiff', provide a unified diff.
 			pendingInput = ""
 		} else {
 			fmt.Print("> ")
-			var inputLines []string
-			for {
-				line, err := reader.ReadString('\n')
-				if line != "" {
-					inputLines = append(inputLines, strings.TrimRight(line, "\r\n"))
-				}
+			var err error
+			input, err = readInteractiveInput()
+			if err != nil {
 				if err == io.EOF {
 					break
 				}
-				if err != nil {
-					fmt.Printf("Error reading input: %v\n", err)
-					os.Exit(1)
-				}
+				fmt.Printf("Error reading input: %v\n", err)
+				os.Exit(1)
 			}
-
-			if len(inputLines) == 0 {
-				break
-			}
-
-			input = strings.Join(inputLines, "\n")
 			if strings.TrimSpace(input) == "" {
 				continue
 			}
