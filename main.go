@@ -19,16 +19,18 @@ const (
 // --- API Structures ---
 
 type ChatCompletionRequest struct {
-	Model    string    `json:"model"`
-	Messages []Message `json:"messages"`
-	Tools    []Tool    `json:"tools,omitempty"`
+	Model     string          `json:"model"`
+	Messages  []Message       `json:"messages"`
+	Tools     []Tool          `json:"tools,omitempty"`
+	ExtraBody json.RawMessage `json:"extra_body,omitempty"`
 }
 
 type Message struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content,omitempty"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Role         string           `json:"role"`
+	Content      string           `json:"content,omitempty"`
+	ToolCalls    []ToolCall       `json:"tool_calls,omitempty"`
+	ToolCallID   string           `json:"tool_call_id,omitempty"`
+	ExtraContent json.RawMessage  `json:"extra_content,omitempty"`
 }
 
 type Tool struct {
@@ -144,6 +146,7 @@ When using 'apply_udiff', provide a unified diff.
 				Model:    ModelName,
 				Messages: messages,
 				Tools:    []Tool{udiffTool},
+				ExtraBody: json.RawMessage(`{"google": {"thinking_config": {"include_thoughts": true}}}`),
 			}
 
 			jsonData, err := json.Marshal(reqBody)
@@ -198,8 +201,13 @@ When using 'apply_udiff', provide a unified diff.
 			msg := chatResp.Choices[0].Message
 			messages = append(messages, msg)
 
+			// Print thoughts if present
+			printThought(msg.ExtraContent)
+
 			if len(msg.ToolCalls) > 0 {
 				for _, toolCall := range msg.ToolCalls {
+					printThought(toolCall.ExtraContent)
+
 					if toolCall.Function.Name == "apply_udiff" {
 						fmt.Printf("[Tool Call: apply_udiff]\n")
 
@@ -353,4 +361,18 @@ func parseHunks(diff string) []Hunk {
 	}
 
 	return hunks
+}
+
+func printThought(extraContent json.RawMessage) {
+	if len(extraContent) == 0 {
+		return
+	}
+	var content struct {
+		Google struct {
+			Thought string `json:"thought"`
+		} `json:"google"`
+	}
+	if err := json.Unmarshal(extraContent, &content); err == nil && content.Google.Thought != "" {
+		fmt.Printf("[Thought] %s\n", content.Google.Thought)
+	}
 }
