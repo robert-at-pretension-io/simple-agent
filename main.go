@@ -1338,7 +1338,7 @@ func generateCommitMessage(apiKey string, history []Message) (string, error) {
 		}
 	}
 
-	systemPrompt := "You are an expert developer. Generate a tight git commit message (less than 15 words) describing the changes made in the provided conversation history. Output ONLY the commit message. Do not use markdown or quotes."
+	systemPrompt := "Generate a tight git commit message describing the changes made in the provided conversation history. Output ONLY the commit message. Do not use markdown or quotes."
 
 	reqBody := ChatCompletionRequest{
 		Model: FlashModelName,
