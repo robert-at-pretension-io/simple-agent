@@ -1,3 +1,0 @@
-Code flows like a stream
-Bugs are hidden in the depths
-Fix them one by one
