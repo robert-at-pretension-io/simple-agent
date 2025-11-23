@@ -2,24 +2,76 @@ package main
 
 import (
 	"bufio"
-	"context"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
-
-	openai "github.com/sashabaranov/go-openai"
 )
 
 const (
-	GeminiBaseURL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-	ModelName     = "gemini-3.0-pro-preview"
+	GeminiURL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+	ModelName = "gemini-3.0-pro-preview"
 )
 
-// Tool definition for apply_udiff
-var udiffTool = openai.Tool{
-	Type: openai.ToolTypeFunction,
-	Function: &openai.FunctionDefinition{
+// --- API Structures ---
+
+type ChatCompletionRequest struct {
+	Model    string    `json:"model"`
+	Messages []Message `json:"messages"`
+	Tools    []Tool    `json:"tools,omitempty"`
+}
+
+type Message struct {
+	Role       string     `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
+}
+
+type Tool struct {
+	Type     string             `json:"type"`
+	Function FunctionDefinition `json:"function"`
+}
+
+type FunctionDefinition struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Parameters  json.RawMessage `json:"parameters"`
+}
+
+type ToolCall struct {
+	ID       string           `json:"id"`
+	Type     string           `json:"type"`
+	Function ToolCallFunction `json:"function"`
+}
+
+type ToolCallFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+type ChatCompletionResponse struct {
+	Choices []Choice  `json:"choices"`
+	Error   *APIError `json:"error,omitempty"`
+}
+
+type APIError struct {
+	Message string `json:"message"`
+	Code    any    `json:"code"`
+}
+
+type Choice struct {
+	Message Message `json:"message"`
+}
+
+// --- Tool Definition ---
+
+var udiffTool = Tool{
+	Type: "function",
+	Function: FunctionDefinition{
 		Name:        "apply_udiff",
 		Description: "Apply a unified diff to a file. The diff should be in standard unified format (diff -U0), including headers.",
 		Parameters: json.RawMessage(`{
@@ -39,6 +91,8 @@ var udiffTool = openai.Tool{
 	},
 }
 
+// --- Main ---
+
 func main() {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
@@ -46,13 +100,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	config := openai.DefaultConfig(apiKey)
-	config.BaseURL = GeminiBaseURL
-	client := openai.NewClientWithConfig(config)
-
-	messages := []openai.ChatCompletionMessage{
+	messages := []Message{
 		{
-			Role: openai.ChatMessageRoleSystem,
+			Role: "system",
 			Content: `Act as an expert software developer.
 You have access to a tool 'apply_udiff' to edit files.
 When using 'apply_udiff', provide a unified diff.
@@ -70,6 +120,8 @@ When using 'apply_udiff', provide a unified diff.
 	fmt.Printf("Welcome to Gemini REPL (%s)\n", ModelName)
 	fmt.Println("Type your message and press Enter. Ctrl+C to exit.")
 
+	client := &http.Client{}
+
 	for {
 		fmt.Print("> ")
 		if !scanner.Scan() {
@@ -80,42 +132,83 @@ When using 'apply_udiff', provide a unified diff.
 			continue
 		}
 
-		messages = append(messages, openai.ChatCompletionMessage{
-			Role:    openai.ChatMessageRoleUser,
+		messages = append(messages, Message{
+			Role:    "user",
 			Content: input,
 		})
 
 		// Interaction loop (handle tool calls)
 		for {
-			resp, err := client.CreateChatCompletion(
-				context.Background(),
-				openai.ChatCompletionRequest{
-					Model:    ModelName,
-					Messages: messages,
-					Tools:    []openai.Tool{udiffTool},
-				},
-			)
+			reqBody := ChatCompletionRequest{
+				Model:    ModelName,
+				Messages: messages,
+				Tools:    []Tool{udiffTool},
+			}
 
+			jsonData, err := json.Marshal(reqBody)
 			if err != nil {
-				fmt.Printf("Error: %v\n", err)
+				fmt.Printf("Error marshaling request: %v\n", err)
 				break
 			}
 
-			msg := resp.Choices[0].Message
+			req, err := http.NewRequest("POST", GeminiURL, bytes.NewBuffer(jsonData))
+			if err != nil {
+				fmt.Printf("Error creating request: %v\n", err)
+				break
+			}
+
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Printf("Error sending request: %v\n", err)
+				break
+			}
+			defer resp.Body.Close()
+
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Printf("Error reading response: %v\n", err)
+				break
+			}
+
+			if resp.StatusCode != http.StatusOK {
+				fmt.Printf("API Error (Status %d): %s\n", resp.StatusCode, string(body))
+				break
+			}
+
+			var chatResp ChatCompletionResponse
+			if err := json.Unmarshal(body, &chatResp); err != nil {
+				fmt.Printf("Error parsing response: %v\n", err)
+				break
+			}
+
+			if chatResp.Error != nil {
+				fmt.Printf("API Error: %s\n", chatResp.Error.Message)
+				break
+			}
+
+			if len(chatResp.Choices) == 0 {
+				fmt.Println("No choices returned from API")
+				break
+			}
+
+			msg := chatResp.Choices[0].Message
 			messages = append(messages, msg)
 
 			if len(msg.ToolCalls) > 0 {
 				for _, toolCall := range msg.ToolCalls {
 					if toolCall.Function.Name == "apply_udiff" {
 						fmt.Printf("[Tool Call: apply_udiff]\n")
-						
+
 						var args struct {
 							Path string `json:"path"`
 							Diff string `json:"diff"`
 						}
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-							messages = append(messages, openai.ChatCompletionMessage{
-								Role:       openai.ChatMessageRoleTool,
+							messages = append(messages, Message{
+								Role:       "tool",
 								Content:    fmt.Sprintf("Error parsing arguments: %v", err),
 								ToolCallID: toolCall.ID,
 							})
@@ -125,15 +218,15 @@ When using 'apply_udiff', provide a unified diff.
 						output, err := applyUDiff(args.Path, args.Diff)
 						if err != nil {
 							fmt.Printf("Error applying diff: %v\n", err)
-							messages = append(messages, openai.ChatCompletionMessage{
-								Role:       openai.ChatMessageRoleTool,
+							messages = append(messages, Message{
+								Role:       "tool",
 								Content:    fmt.Sprintf("Error applying diff: %v", err),
 								ToolCallID: toolCall.ID,
 							})
 						} else {
 							fmt.Printf("Successfully applied diff to %s\n", args.Path)
-							messages = append(messages, openai.ChatCompletionMessage{
-								Role:       openai.ChatMessageRoleTool,
+							messages = append(messages, Message{
+								Role:       "tool",
 								Content:    "Diff applied successfully.",
 								ToolCallID: toolCall.ID,
 							})
@@ -151,6 +244,8 @@ When using 'apply_udiff', provide a unified diff.
 	}
 }
 
+// --- UDiff Logic ---
+
 // applyUDiff applies a unified diff to a file
 func applyUDiff(path string, diff string) (string, error) {
 	// Read original file
@@ -167,17 +262,13 @@ func applyUDiff(path string, diff string) (string, error) {
 
 	// Normalize line endings to \n
 	content = strings.ReplaceAll(content, "\r\n", "\n")
-	
+
 	hunks := parseHunks(diff)
 	if len(hunks) == 0 {
 		return "", fmt.Errorf("no valid hunks found in diff")
 	}
 
 	// Apply hunks
-	// We apply them sequentially. Since we are doing search/replace, 
-	// we need to be careful about order if multiple hunks touch the same file.
-	// Usually diffs are generated top-to-bottom.
-	
 	newContent := content
 	for _, hunk := range hunks {
 		// Create search block
@@ -191,13 +282,10 @@ func applyUDiff(path string, diff string) (string, error) {
 		}
 
 		// Check if search block exists
-		// We count occurrences to ensure uniqueness if possible, 
-		// but for this simple implementation, we'll just replace the first occurrence.
-		// A more robust implementation would check for uniqueness.
 		if !strings.Contains(newContent, searchBlock) {
 			return "", fmt.Errorf("hunk failed to apply: context not found.\nSearch Block:\n%s", searchBlock)
 		}
-		
+
 		// Perform replacement (replace 1 occurrence)
 		newContent = strings.Replace(newContent, searchBlock, replaceBlock, 1)
 	}
@@ -223,7 +311,7 @@ func parseHunks(diff string) []Hunk {
 
 	for _, line := range lines {
 		line = strings.TrimRight(line, "\r") // Handle Windows line endings in diff string
-		
+
 		// Check for hunk header
 		if strings.HasPrefix(line, "@@") {
 			if currentHunk != nil {
