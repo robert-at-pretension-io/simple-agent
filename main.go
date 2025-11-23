@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -70,7 +73,7 @@ type Choice struct {
 	Message Message `json:"message"`
 }
 
-// --- Tool Definition ---
+// --- Tool Definitions ---
 
 var udiffTool = Tool{
 	Type: "function",
@@ -94,6 +97,138 @@ var udiffTool = Tool{
 	},
 }
 
+var readFileTool = Tool{
+	Type: "function",
+	Function: FunctionDefinition{
+		Name:        "read_file",
+		Description: "Read the contents of a file.",
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"path": {
+					"type": "string",
+					"description": "The path to the file to read"
+				}
+			},
+			"required": ["path"]
+		}`),
+	},
+}
+
+var runScriptTool = Tool{
+	Type: "function",
+	Function: FunctionDefinition{
+		Name:        "run_script",
+		Description: "Execute a command line script or shell command.",
+		Parameters: json.RawMessage(`{
+			"type": "object",
+			"properties": {
+				"command": {
+					"type": "string",
+					"description": "The command to execute (e.g., 'python scripts/analyze.py' or 'ls -la')"
+				}
+			},
+			"required": ["command"]
+		}`),
+	},
+}
+
+// --- Skills System ---
+
+type Skill struct {
+	Name           string
+	Description    string
+	Path           string
+	DefinitionFile string
+}
+
+func discoverSkills(root string) []Skill {
+	var skills []Skill
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		return skills
+	}
+
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !d.IsDir() && d.Name() == "SKILL.md" {
+			skill, err := parseSkill(path)
+			if err == nil {
+				skills = append(skills, skill)
+			}
+		}
+		return nil
+	})
+	return skills
+}
+
+func parseSkill(path string) (Skill, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return Skill{}, err
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	var name, description string
+	inFrontmatter := false
+	lineCount := 0
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "---" {
+			if lineCount == 0 {
+				inFrontmatter = true
+				lineCount++
+				continue
+			}
+			if inFrontmatter {
+				break // End of frontmatter
+			}
+		}
+
+		if inFrontmatter {
+			if strings.HasPrefix(line, "name:") {
+				name = strings.TrimSpace(strings.TrimPrefix(line, "name:"))
+			} else if strings.HasPrefix(line, "description:") {
+				description = strings.TrimSpace(strings.TrimPrefix(line, "description:"))
+			}
+		}
+		lineCount++
+	}
+
+	if name == "" {
+		return Skill{}, fmt.Errorf("no name found in frontmatter")
+	}
+
+	absPath, _ := filepath.Abs(filepath.Dir(path))
+	defFile, _ := filepath.Abs(path)
+
+	return Skill{
+		Name:           name,
+		Description:    description,
+		Path:           absPath,
+		DefinitionFile: defFile,
+	}, nil
+}
+
+func generateSkillsPrompt(skills []Skill) string {
+	if len(skills) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("\n# Available Skills\n")
+	sb.WriteString("You can perform complex tasks by using the following skills.\n")
+	sb.WriteString("To use one, read the definition file first using 'read_file'.\n\n")
+
+	for _, s := range skills {
+		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", s.Name, s.Description))
+		sb.WriteString(fmt.Sprintf("  Definition: %s\n", s.DefinitionFile))
+	}
+	return sb.String()
+}
+
 // --- Main ---
 
 func main() {
@@ -103,11 +238,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	messages := []Message{
-		{
-			Role: "system",
-			Content: `Act as an expert software developer.
-You have access to a tool 'apply_udiff' to edit files.
+	// Discover skills
+	skills := discoverSkills("./skills")
+	skillsPrompt := generateSkillsPrompt(skills)
+
+	baseSystemPrompt := `Act as an expert software developer.
+You have access to tools to edit files, read files, and execute scripts.
 When using 'apply_udiff', provide a unified diff.
 - Start hunks with '@@ ... @@'
 - Use ' ' for context, '-' for removal, '+' for addition.
@@ -115,12 +251,21 @@ When using 'apply_udiff', provide a unified diff.
 - Ensure enough context is provided to uniquely locate the code.
 - Replace entire blocks/functions rather than small internal edits to ensure uniqueness.
 - If a file does not exist, treat it as empty for the 'before' state.
-`,
+`
+	systemPrompt := baseSystemPrompt + skillsPrompt
+
+	messages := []Message{
+		{
+			Role:    "system",
+			Content: systemPrompt,
 		},
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Printf("Welcome to Gemini REPL (%s)\n", ModelName)
+	if len(skills) > 0 {
+		fmt.Printf("Loaded %d skills from ./skills\n", len(skills))
+	}
 	fmt.Println("Type your message and press Enter. Ctrl+C to exit.")
 
 	client := &http.Client{}
@@ -143,9 +288,9 @@ When using 'apply_udiff', provide a unified diff.
 		// Interaction loop (handle tool calls)
 		for {
 			reqBody := ChatCompletionRequest{
-				Model:    ModelName,
-				Messages: messages,
-				Tools:    []Tool{udiffTool},
+				Model:     ModelName,
+				Messages:  messages,
+				Tools:     []Tool{udiffTool, readFileTool, runScriptTool},
 				ExtraBody: json.RawMessage(`{"google": {"thinking_config": {"include_thoughts": true}}}`),
 			}
 
@@ -208,39 +353,66 @@ When using 'apply_udiff', provide a unified diff.
 				for _, toolCall := range msg.ToolCalls {
 					printThought(toolCall.ExtraContent)
 
-					if toolCall.Function.Name == "apply_udiff" {
-						fmt.Printf("[Tool Call: apply_udiff]\n")
+					var toolResult string
+					var toolErr error
 
+					switch toolCall.Function.Name {
+					case "apply_udiff":
+						fmt.Printf("[Tool Call: apply_udiff]\n")
 						var args struct {
 							Path string `json:"path"`
 							Diff string `json:"diff"`
 						}
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-							messages = append(messages, Message{
-								Role:       "tool",
-								Content:    fmt.Sprintf("Error parsing arguments: %v", err),
-								ToolCallID: toolCall.ID,
-							})
-							continue
+							toolErr = fmt.Errorf("error parsing arguments: %v", err)
+						} else {
+							toolResult, toolErr = applyUDiff(args.Path, args.Diff)
+							if toolErr == nil {
+								fmt.Printf("Successfully applied diff to %s\n", args.Path)
+								toolResult = "Diff applied successfully."
+							}
 						}
 
-						_, err := applyUDiff(args.Path, args.Diff)
-						if err != nil {
-							fmt.Printf("Error applying diff: %v\n", err)
-							messages = append(messages, Message{
-								Role:       "tool",
-								Content:    fmt.Sprintf("Error applying diff: %v", err),
-								ToolCallID: toolCall.ID,
-							})
-						} else {
-							fmt.Printf("Successfully applied diff to %s\n", args.Path)
-							messages = append(messages, Message{
-								Role:       "tool",
-								Content:    "Diff applied successfully.",
-								ToolCallID: toolCall.ID,
-							})
+					case "read_file":
+						fmt.Printf("[Tool Call: read_file]\n")
+						var args struct {
+							Path string `json:"path"`
 						}
+						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+							toolErr = fmt.Errorf("error parsing arguments: %v", err)
+						} else {
+							fmt.Printf("Reading file: %s\n", args.Path)
+							toolResult, toolErr = readFile(args.Path)
+						}
+
+					case "run_script":
+						fmt.Printf("[Tool Call: run_script]\n")
+						var args struct {
+							Command string `json:"command"`
+						}
+						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
+							toolErr = fmt.Errorf("error parsing arguments: %v", err)
+						} else {
+							fmt.Printf("Executing: %s\n", args.Command)
+							toolResult, toolErr = runScript(args.Command)
+						}
+
+					default:
+						toolErr = fmt.Errorf("unknown tool: %s", toolCall.Function.Name)
 					}
+
+					// Append tool response
+					content := toolResult
+					if toolErr != nil {
+						fmt.Printf("Tool Error: %v\n", toolErr)
+						content = fmt.Sprintf("Error: %v", toolErr)
+					}
+
+					messages = append(messages, Message{
+						Role:       "tool",
+						Content:    content,
+						ToolCallID: toolCall.ID,
+					})
 				}
 				// Loop back to send tool outputs to model
 				continue
@@ -253,7 +425,25 @@ When using 'apply_udiff', provide a unified diff.
 	}
 }
 
-// --- UDiff Logic ---
+// --- Tool Implementations ---
+
+func readFile(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %w", err)
+	}
+	return string(data), nil
+}
+
+func runScript(command string) (string, error) {
+	// Using sh -c to allow for shell features (pipes, etc) and script execution
+	cmd := exec.Command("sh", "-c", command)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("command failed: %w\nOutput:\n%s", err, string(out))
+	}
+	return string(out), nil
+}
 
 // applyUDiff applies a unified diff to a file
 func applyUDiff(path string, diff string) (string, error) {
