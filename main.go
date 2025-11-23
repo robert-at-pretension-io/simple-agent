@@ -258,9 +258,16 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
 1.  **` + "`SKILL.md`" + `**: The instruction manual.
     - Must start with YAML frontmatter defining ` + "`name`" + ` and ` + "`description`" + `.
     - The body contains Markdown instructions for you to follow.
-    - Can optionally define **hooks** in frontmatter to trigger scripts on system events.
-      Supported hooks: ` + hooksList + `.
-      **Note**: Hooks must refer to a script file within the skill's ` + "`scripts`" + ` directory. They are executed directly.
+    - **Hooks (Recommended)**: Automate workflows by triggering scripts on system events.
+      Define them in the frontmatter under a ` + "`hooks`" + ` section.
+      **Supported Hooks**:
+      - ` + "`startup`" + `: Runs at session start (e.g., dependency checks).
+      - ` + "`pre_edit` / `post_edit`" + `: Runs before/after ` + "`apply_udiff`" + `. **Great for running linters/tests automatically.**
+      - ` + "`pre_view` / `post_view`" + `: Runs before/after ` + "`read_file`" + `.
+      **Example**:
+      hooks:
+        post_edit: scripts/lint.sh
+        startup: scripts/check_deps.sh
 2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts -- note that scripts are all invoked with sh -c [script_path_here] .
     - Prefer using scripts over complex manual steps in ` + "`SKILL.md`" + `.
 
@@ -282,6 +289,7 @@ You can also create new skills to solve problems!
 - **Auditing**: If you find too many specific skills cluttering the system, suggest consolidating them or removing obsolete ones.
 - **Concise**: Only add necessary context in ` + "`SKILL.md`" + `.
 - **Self-Contained**: A skill should include everything needed to run it.
+- **Automate with Hooks**: Whenever possible, use hooks to run validation (linting, testing) automatically rather than writing manual instructions.
 - **Invocation**: Hooks must specify a script path (relative to the skill directory) and arguments.
 
 When faced with a new, complex task that might be repeated, consider creating a new skill for it.
