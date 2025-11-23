@@ -193,19 +193,32 @@ Skills bridge the gap between general reasoning and specific, repeatable tasks. 
 2.  **Encapsulate Logic**: Hide complex details in scripts and instructions.
 3.  **Autonomy**: You read the "manual" (SKILL.md) and drive execution.
 
+## Skill Structure
+A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
+1.  **` + "`SKILL.md`" + `**: The instruction manual.
+    - Must start with YAML frontmatter defining ` + "`name`" + ` and ` + "`description`" + `.
+    - The body contains Markdown instructions for you to follow.
+2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts (Python, Bash, etc.).
+    - Prefer using scripts over complex manual steps in ` + "`SKILL.md`" + `.
+
 ## How to Invoke Skills
 1.  **Discover**: The system provides a list of available skills.
 2.  **Learn**: If a user request matches a skill, use 'read_file' to read its 'SKILL.md'.
-3.  **Execute**: Follow the instructions in 'SKILL.md', often using 'run_script' to execute provided scripts.
+3.  **Execute**: Follow the instructions in 'SKILL.md'.
+    - If the instructions refer to scripts, execute them using 'run_script'.
+    - Scripts are typically located relative to the skill directory (e.g., ` + "`skills/my-skill/scripts/script.py`" + `).
 
 ## Creating and Managing Skills
 You can also create new skills to solve problems!
+1.  **Create Directory**: Create a new folder in ` + "`skills/`" + `.
+2.  **Define Skill**: Create ` + "`SKILL.md`" + ` with frontmatter and instructions.
+3.  **Add Scripts**: Create a ` + "`scripts/`" + ` folder and add any necessary scripts.
+
+**Best Practices**:
 - **Specific vs. General**: Create specific skills for complex, recurring problems. However, prefer general skills that can be reused.
 - **Auditing**: If you find too many specific skills cluttering the system, suggest consolidating them or removing obsolete ones.
-- **Best Practices**:
-    - **Concise**: Only add necessary context.
-    - **Scripts**: Prefer writing utility scripts (e.g., Python, Bash) over asking for manual execution steps.
-    - **Self-Contained**: A skill should include everything needed to run it (scripts, instructions).
+- **Concise**: Only add necessary context in ` + "`SKILL.md`" + `.
+- **Self-Contained**: A skill should include everything needed to run it.
 
 When faced with a new, complex task that might be repeated, consider creating a new skill for it.
 `
