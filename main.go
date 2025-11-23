@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -573,7 +574,15 @@ When using 'apply_udiff', provide a unified diff.
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer "+apiKey)
 
+			spinnerStop := make(chan struct{})
+			spinnerDone := make(chan struct{})
+			go startSpinner(spinnerStop, spinnerDone)
+
 			resp, err := client.Do(req)
+
+			close(spinnerStop)
+			<-spinnerDone
+
 			if err != nil {
 				if ctx.Err() == context.Canceled {
 					fmt.Println("\nRequest canceled.")
@@ -885,6 +894,30 @@ When using 'apply_udiff', provide a unified diff.
 			if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
 				pendingInput = "The context size has exceeded 400,000 tokens. Please use the 'shorten_context' tool to summarize the conversation and reset the context."
 			}
+		}
+	}
+}
+
+func startSpinner(stopChan chan struct{}, doneChan chan struct{}) {
+	defer close(doneChan)
+	chars := []rune{'|', '/', '-', '\\'}
+	i := 0
+	start := time.Now()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	// Initial print
+	fmt.Printf("\r%c Waiting... (0s)", chars[0])
+
+	for {
+		select {
+		case <-stopChan:
+			fmt.Print("\r\033[K") // Clear line
+			return
+		case <-ticker.C:
+			elapsed := time.Since(start).Round(time.Second)
+			fmt.Printf("\r%c Waiting... (%s)", chars[i%len(chars)], elapsed)
+			i++
 		}
 	}
 }
@@ -1392,7 +1425,16 @@ friendly reminder: Please summarize the conversation history above based on the 
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{}
+
+	spinnerStop := make(chan struct{})
+	spinnerDone := make(chan struct{})
+	go startSpinner(spinnerStop, spinnerDone)
+
 	resp, err := client.Do(req)
+
+	close(spinnerStop)
+	<-spinnerDone
+
 	if err != nil {
 		return "", fmt.Errorf("error sending request: %v", err)
 	}
@@ -1467,7 +1509,16 @@ func generateCommitMessage(apiKey string, history []Message) (string, error) {
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	client := &http.Client{}
+
+	spinnerStop := make(chan struct{})
+	spinnerDone := make(chan struct{})
+	go startSpinner(spinnerStop, spinnerDone)
+
 	resp, err := client.Do(req)
+
+	close(spinnerStop)
+	<-spinnerDone
+
 	if err != nil {
 		return "", fmt.Errorf("error sending request: %v", err)
 	}
