@@ -648,7 +648,11 @@ When using 'apply_udiff', provide a unified diff.
 			}
 
 			// No tool calls, just print response
-			fmt.Printf("Gemini: %s\n", msg.Content)
+			cleanContent := extractAndPrintThoughts(msg.Content)
+			if strings.TrimSpace(cleanContent) != "" {
+				fmt.Println("Gemini:")
+				printMarkdown(cleanContent)
+			}
 			break
 		}
 	}
@@ -925,6 +929,55 @@ func printThought(extraContent json.RawMessage) {
 		} `json:"google"`
 	}
 	if err := json.Unmarshal(extraContent, &content); err == nil && content.Google.Thought != "" {
-		fmt.Printf("[Thought] %s\n", content.Google.Thought)
+		fmt.Printf("\033[90m[Thought] %s\033[0m\n", content.Google.Thought)
+	}
+}
+
+func extractAndPrintThoughts(content string) string {
+	re := regexp.MustCompile(`(?s)<thought>(.*?)</thought>`)
+	matches := re.FindAllStringSubmatch(content, -1)
+	for _, match := range matches {
+		if len(match) > 1 {
+			fmt.Printf("\033[90m[Thought] %s\033[0m\n", strings.TrimSpace(match[1]))
+		}
+	}
+	return re.ReplaceAllString(content, "")
+}
+
+func printMarkdown(content string) {
+	lines := strings.Split(content, "\n")
+	inCodeBlock := false
+
+	// ANSI codes
+	reset := "\033[0m"
+	bold := "\033[1m"
+	cyan := "\033[36m"
+	blue := "\033[34m"
+
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "```") {
+			inCodeBlock = !inCodeBlock
+			fmt.Println(cyan + line + reset)
+			continue
+		}
+
+		if inCodeBlock {
+			fmt.Println(cyan + line + reset)
+			continue
+		}
+
+		// Headers
+		if strings.HasPrefix(line, "#") {
+			fmt.Println(bold + blue + line + reset)
+			continue
+		}
+
+		// Inline formatting (simple)
+		// Bold **text**
+		line = regexp.MustCompile(`\*\*(.*?)\*\*`).ReplaceAllString(line, bold+"$1"+reset)
+		// Code `text`
+		line = regexp.MustCompile("`([^`]+)`").ReplaceAllString(line, cyan+"$1"+reset)
+
+		fmt.Println(line)
 	}
 }
