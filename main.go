@@ -231,6 +231,8 @@ var shortenContextTool = Tool{
 type Skill struct {
 	Name           string
 	Description    string
+	Version        string
+	Dependencies   []string
 	Path           string
 	DefinitionFile string
 	Hooks          map[string]string
@@ -315,10 +317,12 @@ func parseSkill(path string) (Skill, error) {
 	defer f.Close()
 
 	scanner := bufio.NewScanner(f)
-	var name, description string
+	var name, description, version string
+	var dependencies []string
 	hooks := make(map[string]string)
 	inFrontmatter := false
 	inHooks := false
+	inDependencies := false
 	lineCount := 0
 
 	for scanner.Scan() {
@@ -339,6 +343,12 @@ func parseSkill(path string) (Skill, error) {
 		if inFrontmatter {
 			if trimmedLine == "hooks:" {
 				inHooks = true
+				inDependencies = false
+				continue
+			}
+			if trimmedLine == "dependencies:" {
+				inDependencies = true
+				inHooks = false
 				continue
 			}
 
@@ -357,11 +367,26 @@ func parseSkill(path string) (Skill, error) {
 				}
 			}
 
-			if !inHooks {
+			if inDependencies {
+				if strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "\t") {
+					val := strings.TrimSpace(trimmedLine)
+					val = strings.TrimPrefix(val, "-")
+					val = strings.TrimSpace(val)
+					if val != "" {
+						dependencies = append(dependencies, val)
+					}
+				} else if trimmedLine != "" {
+					inDependencies = false
+				}
+			}
+
+			if !inHooks && !inDependencies {
 				if strings.HasPrefix(line, "name:") {
 					name = strings.TrimSpace(strings.TrimPrefix(line, "name:"))
 				} else if strings.HasPrefix(line, "description:") {
 					description = strings.TrimSpace(strings.TrimPrefix(line, "description:"))
+				} else if strings.HasPrefix(line, "version:") {
+					version = strings.TrimSpace(strings.TrimPrefix(line, "version:"))
 				}
 			}
 		}
@@ -378,6 +403,8 @@ func parseSkill(path string) (Skill, error) {
 	return Skill{
 		Name:           name,
 		Description:    description,
+		Version:        version,
+		Dependencies:   dependencies,
 		Path:           absPath,
 		DefinitionFile: defFile,
 		Hooks:          hooks,
@@ -394,7 +421,14 @@ func generateSkillsPrompt(skills []Skill) string {
 	sb.WriteString("To use one, read the definition file first using 'read_file'.\n\n")
 
 	for _, s := range skills {
-		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", s.Name, s.Description))
+		sb.WriteString(fmt.Sprintf("- **%s**", s.Name))
+		if s.Version != "" {
+			sb.WriteString(fmt.Sprintf(" (v%s)", s.Version))
+		}
+		sb.WriteString(fmt.Sprintf(": %s\n", s.Description))
+		if len(s.Dependencies) > 0 {
+			sb.WriteString(fmt.Sprintf("  Dependencies: %s\n", strings.Join(s.Dependencies, ", ")))
+		}
 		sb.WriteString(fmt.Sprintf("  Definition: %s\n", s.DefinitionFile))
 	}
 	return sb.String()
