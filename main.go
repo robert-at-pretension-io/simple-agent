@@ -1107,7 +1107,7 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 	switch ext {
 	case ".py":
 		cmdArgs := append([]string{absPath}, args...)
-		cmd = exec.CommandContext(ctx, "python", cmdArgs...)
+		cmd = exec.CommandContext(ctx, "python3", cmdArgs...)
 	case ".sh":
 		cmdArgs := append([]string{absPath}, args...)
 		cmd = exec.CommandContext(ctx, "bash", cmdArgs...)
