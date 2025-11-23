@@ -13,7 +13,7 @@ import (
 
 const (
 	GeminiURL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-	ModelName = "gemini-3.0-pro-preview"
+	ModelName = "gemini-3-pro-preview"
 )
 
 // --- API Structures ---
