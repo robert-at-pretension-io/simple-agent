@@ -692,6 +692,9 @@ When using 'apply_udiff', provide a unified diff.
 			messages = append(messages, msg)
 
 			// Print thoughts if present
+			if len(msg.ToolCalls) > 0 {
+				extractAndPrintThoughts(msg.Content)
+			}
 			printThought(msg.ExtraContent)
 
 			contextReset := false
