@@ -258,6 +258,7 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
     - The body contains Markdown instructions for you to follow.
     - Can optionally define **hooks** in frontmatter to trigger scripts on system events.
       Supported hooks: ` + hooksList + `.
+      **Note**: Hooks are executed using ` + "`sh -c`" + `, so you can use shell features (pipes, redirects, environment variables).
 2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts (Python, Bash, etc.).
     - Prefer using scripts over complex manual steps in ` + "`SKILL.md`" + `.
 
@@ -279,6 +280,7 @@ You can also create new skills to solve problems!
 - **Auditing**: If you find too many specific skills cluttering the system, suggest consolidating them or removing obsolete ones.
 - **Concise**: Only add necessary context in ` + "`SKILL.md`" + `.
 - **Self-Contained**: A skill should include everything needed to run it.
+- **Invocation**: Hooks are invoked using ` + "`sh -c`" + `. Ensure your command strings are compatible.
 
 When faced with a new, complex task that might be repeated, consider creating a new skill for it.
 `
