@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,9 +11,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 const (
@@ -387,7 +390,7 @@ func generateSkillsPrompt(skills []Skill) string {
 	return sb.String()
 }
 
-func runSkillHooks(skills []Skill, event string, context map[string]string) string {
+func runSkillHooks(ctx context.Context, skills []Skill, event string, context map[string]string) string {
 	var output strings.Builder
 	for _, skill := range skills {
 		if cmdTemplate, ok := skill.Hooks[event]; ok {
@@ -401,7 +404,7 @@ func runSkillHooks(skills []Skill, event string, context map[string]string) stri
 			}
 
 			fmt.Printf("[Hook: %s] Running for skill '%s': %s\n", event, skill.Name, cmdStr)
-			out, err := execShellCommand(cmdStr)
+			out, err := execShellCommand(ctx, cmdStr)
 			if err != nil {
 				fmt.Printf("[Hook Error] %v\n", err)
 				output.WriteString(fmt.Sprintf("Hook '%s' (skill: %s) failed: %v\n", event, skill.Name, err))
@@ -432,8 +435,30 @@ func main() {
 		knownSkills[s.Name] = true
 	}
 
-	// Run startup hooks
-	runSkillHooks(skills, "startup", nil)
+	// Setup signal handling for interruption
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt)
+
+	var currentCancel context.CancelFunc
+	var mu sync.Mutex
+
+	go func() {
+		for range sigChan {
+			mu.Lock()
+			if currentCancel != nil {
+				fmt.Println("\n[Interrupted by user]")
+				currentCancel()
+				currentCancel = nil
+			} else {
+				fmt.Println("\nExiting...")
+				os.Exit(0)
+			}
+			mu.Unlock()
+		}
+	}()
+
+	// Run startup hooks (using background context as this is init)
+	runSkillHooks(context.Background(), skills, "startup", nil)
 
 	baseSystemPrompt := `You have access to tools to edit files, read files, list files, search files, and execute scripts.
 When using 'apply_udiff', provide a unified diff.
@@ -458,7 +483,7 @@ When using 'apply_udiff', provide a unified diff.
 	if len(skills) > 0 {
 		fmt.Printf("Loaded %d skills from ./skills\n", len(skills))
 	}
-	fmt.Println("Type your message. Press Ctrl+D (or Ctrl+Z on Windows) on a new line to send. Ctrl+C to exit.")
+	fmt.Println("Type your message. Press Ctrl+D (or Ctrl+Z on Windows) on a new line to send. Ctrl+C to interrupt/exit.")
 
 	client := &http.Client{}
 
@@ -496,8 +521,18 @@ When using 'apply_udiff', provide a unified diff.
 			Content: input,
 		})
 
+		// Start of turn: Create context and register cancel function
+		ctx, cancel := context.WithCancel(context.Background())
+		mu.Lock()
+		currentCancel = cancel
+		mu.Unlock()
+
 		// Interaction loop (handle tool calls)
 		for {
+			if ctx.Err() != nil {
+				break
+			}
+
 			reqBody := ChatCompletionRequest{
 				Model:     ModelName,
 				Messages:  messages,
@@ -511,7 +546,7 @@ When using 'apply_udiff', provide a unified diff.
 				break
 			}
 
-			req, err := http.NewRequest("POST", GeminiURL, bytes.NewBuffer(jsonData))
+			req, err := http.NewRequestWithContext(ctx, "POST", GeminiURL, bytes.NewBuffer(jsonData))
 			if err != nil {
 				fmt.Printf("Error creating request: %v\n", err)
 				break
@@ -522,6 +557,10 @@ When using 'apply_udiff', provide a unified diff.
 
 			resp, err := client.Do(req)
 			if err != nil {
+				if ctx.Err() == context.Canceled {
+					fmt.Println("\nRequest canceled.")
+					break
+				}
 				fmt.Printf("Error sending request: %v\n", err)
 				break
 			}
@@ -564,6 +603,10 @@ When using 'apply_udiff', provide a unified diff.
 
 			if len(msg.ToolCalls) > 0 {
 				for _, toolCall := range msg.ToolCalls {
+					if ctx.Err() != nil {
+						break
+					}
+
 					printThought(toolCall.ExtraContent)
 
 					var toolResult string
@@ -580,7 +623,7 @@ When using 'apply_udiff', provide a unified diff.
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
 							// Dry run first to check validity and generate helpful errors
-							_, err := applyUDiff(args.Path, args.Diff, true)
+							_, err := applyUDiff(ctx, args.Path, args.Diff, true)
 							if err != nil {
 								toolErr = err
 							} else {
@@ -591,26 +634,30 @@ When using 'apply_udiff', provide a unified diff.
 								// Ask for confirmation
 								fmt.Print("Apply these changes? [y/N]: ")
 								confirm, _ := reader.ReadString('\n')
-								confirm = strings.TrimSpace(confirm)
-
-								if strings.ToLower(confirm) == "y" {
-									// Pre-edit hook
-									runSkillHooks(skills, "pre_edit", map[string]string{"path": args.Path})
-
-									toolResult, toolErr = applyUDiff(args.Path, args.Diff, false)
-									if toolErr == nil {
-										fmt.Printf("Successfully applied diff to %s\n", args.Path)
-										toolResult = "Diff applied successfully."
-									}
-
-									// Post-edit hook
-									hookOut := runSkillHooks(skills, "post_edit", map[string]string{"path": args.Path})
-									if hookOut != "" {
-										toolResult += "\n\n[Hook Output]\n" + hookOut
-									}
+								if ctx.Err() != nil {
+									toolErr = fmt.Errorf("interrupted by user")
 								} else {
-									fmt.Println("Changes rejected.")
-									toolResult = "User rejected the changes."
+									confirm = strings.TrimSpace(confirm)
+
+									if strings.ToLower(confirm) == "y" {
+										// Pre-edit hook
+										runSkillHooks(ctx, skills, "pre_edit", map[string]string{"path": args.Path})
+
+										toolResult, toolErr = applyUDiff(ctx, args.Path, args.Diff, false)
+										if toolErr == nil {
+											fmt.Printf("Successfully applied diff to %s\n", args.Path)
+											toolResult = "Diff applied successfully."
+										}
+
+										// Post-edit hook
+										hookOut := runSkillHooks(ctx, skills, "post_edit", map[string]string{"path": args.Path})
+										if hookOut != "" {
+											toolResult += "\n\n[Hook Output]\n" + hookOut
+										}
+									} else {
+										fmt.Println("Changes rejected.")
+										toolResult = "User rejected the changes."
+									}
 								}
 							}
 						}
@@ -626,13 +673,13 @@ When using 'apply_udiff', provide a unified diff.
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
 							// Pre-view hook
-							runSkillHooks(skills, "pre_view", map[string]string{"path": args.Path})
+							runSkillHooks(ctx, skills, "pre_view", map[string]string{"path": args.Path})
 
 							fmt.Printf("Reading file: %s (lines %d-%d)\n", args.Path, args.StartLine, args.EndLine)
-							toolResult, toolErr = readFile(args.Path, args.StartLine, args.EndLine)
+							toolResult, toolErr = readFile(ctx, args.Path, args.StartLine, args.EndLine)
 
 							// Post-view hook
-							hookOut := runSkillHooks(skills, "post_view", map[string]string{"path": args.Path})
+							hookOut := runSkillHooks(ctx, skills, "post_view", map[string]string{"path": args.Path})
 							if hookOut != "" {
 								toolResult += "\n\n[Hook Output]\n" + hookOut
 							}
@@ -648,7 +695,7 @@ When using 'apply_udiff', provide a unified diff.
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
 							fmt.Printf("Executing script: %s %v\n", args.Path, args.Args)
-							toolResult, toolErr = runSafeScript(args.Path, args.Args, skillsPrompt)
+							toolResult, toolErr = runSafeScript(ctx, args.Path, args.Args, skillsPrompt)
 						}
 
 					case "list_files":
@@ -773,6 +820,14 @@ When using 'apply_udiff', provide a unified diff.
 			break
 		}
 
+		// End of turn cleanup
+		mu.Lock()
+		if currentCancel != nil {
+			cancel()
+			currentCancel = nil
+		}
+		mu.Unlock()
+
 		// End of turn: Check for git changes and propose commit
 		if isGitDirty() {
 			// Get conversation history for this turn
@@ -831,7 +886,7 @@ func validatePath(path string) (string, error) {
 	return absPath, nil
 }
 
-func readFile(path string, startLine, endLine int) (string, error) {
+func readFile(ctx context.Context, path string, startLine, endLine int) (string, error) {
 	absPath, err := validatePath(path)
 	if err != nil {
 		return "", err
@@ -862,9 +917,9 @@ func readFile(path string, startLine, endLine int) (string, error) {
 	return strings.Join(lines[startLine-1:endLine], "\n"), nil
 }
 
-func execShellCommand(command string) (string, error) {
+func execShellCommand(ctx context.Context, command string) (string, error) {
 	// Using sh -c to allow for shell features (pipes, etc) and script execution
-	cmd := exec.Command("sh", "-c", command)
+	cmd := exec.CommandContext(ctx, "sh", "-c", command)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), fmt.Errorf("command failed: %w\nOutput:\n%s", err, string(out))
@@ -872,7 +927,7 @@ func execShellCommand(command string) (string, error) {
 	return string(out), nil
 }
 
-func runSafeScript(scriptPath string, args []string, skillsPrompt string) (string, error) {
+func runSafeScript(ctx context.Context, scriptPath string, args []string, skillsPrompt string) (string, error) {
 	// Validate path
 	absPath, err := validatePath(scriptPath)
 	if err != nil {
@@ -910,16 +965,16 @@ func runSafeScript(scriptPath string, args []string, skillsPrompt string) (strin
 	switch ext {
 	case ".py":
 		cmdArgs := append([]string{absPath}, args...)
-		cmd = exec.Command("python", cmdArgs...)
+		cmd = exec.CommandContext(ctx, "python", cmdArgs...)
 	case ".sh":
 		cmdArgs := append([]string{absPath}, args...)
-		cmd = exec.Command("bash", cmdArgs...)
+		cmd = exec.CommandContext(ctx, "bash", cmdArgs...)
 	case ".js":
 		cmdArgs := append([]string{absPath}, args...)
-		cmd = exec.Command("node", cmdArgs...)
+		cmd = exec.CommandContext(ctx, "node", cmdArgs...)
 	default:
 		// Try to execute directly
-		cmd = exec.Command(absPath, args...)
+		cmd = exec.CommandContext(ctx, absPath, args...)
 	}
 
 	out, err := cmd.CombinedOutput()
@@ -1010,7 +1065,7 @@ func searchFiles(root string, pattern string) (string, error) {
 }
 
 // applyUDiff applies a unified diff to a file
-func applyUDiff(path string, diff string, dryRun bool) (string, error) {
+func applyUDiff(ctx context.Context, path string, diff string, dryRun bool) (string, error) {
 	absPath, err := validatePath(path)
 	if err != nil {
 		return "", err
@@ -1039,6 +1094,11 @@ func applyUDiff(path string, diff string, dryRun bool) (string, error) {
 	// Apply hunks
 	newContent := content
 	for i, hunk := range hunks {
+		// Check context cancellation
+		if ctx.Err() != nil {
+			return "", ctx.Err()
+		}
+
 		// Create search block
 		searchBlock := strings.Join(hunk.SearchLines, "\n")
 		replaceBlock := strings.Join(hunk.ReplaceLines, "\n")
