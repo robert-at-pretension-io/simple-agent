@@ -215,7 +215,7 @@ When using 'apply_udiff', provide a unified diff.
 							continue
 						}
 
-						output, err := applyUDiff(args.Path, args.Diff)
+						_, err := applyUDiff(args.Path, args.Diff)
 						if err != nil {
 							fmt.Printf("Error applying diff: %v\n", err)
 							messages = append(messages, Message{
