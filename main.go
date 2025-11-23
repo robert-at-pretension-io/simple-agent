@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	GeminiURL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-	ModelName = "gemini-3-pro-preview"
+	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+	ModelName      = "gemini-3-pro-preview"
+	FlashModelName = "gemini-2.5-flash"
 )
 
 // --- API Structures ---
@@ -472,6 +473,9 @@ When using 'apply_udiff', provide a unified diff.
 			continue
 		}
 
+		// Capture the start index of the current turn's messages
+		startHistoryIndex := len(messages)
+
 		messages = append(messages, Message{
 			Role:    "user",
 			Content: input,
@@ -753,6 +757,34 @@ When using 'apply_udiff', provide a unified diff.
 				printMarkdown(cleanContent)
 			}
 			break
+		}
+
+		// End of turn: Check for git changes and propose commit
+		if isGitDirty() {
+			// Get conversation history for this turn
+			var turnHistory []Message
+			if startHistoryIndex < len(messages) {
+				turnHistory = messages[startHistoryIndex:]
+			}
+
+			commitMsg, err := generateCommitMessage(apiKey, turnHistory)
+			if err != nil {
+				fmt.Printf("Failed to generate commit message: %v\n", err)
+			} else {
+				fmt.Printf("\n[Git] Proposed commit message: %s\n", commitMsg)
+				fmt.Print("Commit these changes? [y/N]: ")
+				var confirm string
+				if scanner.Scan() {
+					confirm = scanner.Text()
+				}
+				if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
+					if err := gitCommit(commitMsg); err != nil {
+						fmt.Printf("Git commit failed: %v\n", err)
+					} else {
+						fmt.Println("Changes committed successfully.")
+					}
+				}
+			}
 		}
 	}
 }
@@ -1280,4 +1312,94 @@ friendly reminder: Please summarize the conversation history above based on the 
 	}
 
 	return chatResp.Choices[0].Message.Content, nil
+}
+
+// --- Git Integration ---
+
+func isGitDirty() bool {
+	cmd := exec.Command("git", "status", "--porcelain")
+	out, err := cmd.Output()
+	if err != nil {
+		// If git fails (e.g. not a repo), assume not dirty
+		return false
+	}
+	return len(bytes.TrimSpace(out)) > 0
+}
+
+func generateCommitMessage(apiKey string, history []Message) (string, error) {
+	// Convert history to a transcript string to avoid tool call complexity with Flash
+	var historyBuf bytes.Buffer
+	for _, msg := range history {
+		historyBuf.WriteString(fmt.Sprintf("%s: %s\n", msg.Role, msg.Content))
+		if len(msg.ToolCalls) > 0 {
+			for _, tc := range msg.ToolCalls {
+				historyBuf.WriteString(fmt.Sprintf("Tool Call: %s (%s)\n", tc.Function.Name, tc.Function.Arguments))
+			}
+		}
+	}
+
+	systemPrompt := "You are an expert developer. Generate a tight git commit message (less than 15 words) describing the changes made in the provided conversation history. Output ONLY the commit message. Do not use markdown or quotes."
+
+	reqBody := ChatCompletionRequest{
+		Model: FlashModelName,
+		Messages: []Message{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: historyBuf.String()},
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	req, err := http.NewRequest("POST", GeminiURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API Error (Status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var chatResp ChatCompletionResponse
+	if err := json.Unmarshal(body, &chatResp); err != nil {
+		return "", fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if len(chatResp.Choices) == 0 {
+		return "", fmt.Errorf("no choices returned from API")
+	}
+
+	return strings.TrimSpace(chatResp.Choices[0].Message.Content), nil
+}
+
+func gitCommit(message string) error {
+	// Stage all changes
+	addCmd := exec.Command("git", "add", ".")
+	if out, err := addCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git add failed: %v\n%s", err, out)
+	}
+
+	// Commit
+	commitCmd := exec.Command("git", "commit", "-m", message)
+	if out, err := commitCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git commit failed: %v\n%s", err, out)
+	}
+	return nil
 }
