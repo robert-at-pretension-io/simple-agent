@@ -1137,9 +1137,7 @@ func summarizeContext(apiKey string, history []Message, task, future, vital stri
 Ensure the summary is concise but retains all information necessary to continue working on the task and future plans.
 Preserve code snippets or specific data mentioned in "Vital Information".`, task, future, vital)
 
-	prompt := fmt.Sprintf(`You are an expert technical assistant.
-The user wants to shorten the conversation context.
-Please summarize the provided conversation history, adhering to the following constraints:
+	prompt := fmt.Sprintf(`Please summarize the provided conversation history, adhering to the following constraints:
 
 %s
 
@@ -1147,7 +1145,7 @@ Conversation History:
 %s
 
 ---
-IMPORTANT: Please summarize the conversation history above based on the following constraints:
+friendly reminder: Please summarize the conversation history above based on the following constraints:
 %s
 `, instructions, historyBuf.String(), instructions)
 
