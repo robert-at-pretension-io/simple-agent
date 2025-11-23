@@ -12,9 +12,9 @@ dependencies:
 This skill provides specialized tools to extract deep context from the git repository. Use this to orient yourself when starting a task, understanding what recently changed, or identifying volatile files.
 
 ## When to Apply
-- **Start of Task**: Run `get_status.sh` and `recent_context.sh` to see what the user was just working on.
-- **Debugging**: Run `file_history.sh` on a buggy file to see recent changes that might have introduced the bug.
-- **Project Analysis**: Run `churn_analysis.sh` to identify "hotspots" in the codebase (files that change frequently).
+- **Start of Task**: IMMEDIATELY run `scripts/get_status.sh` and `scripts/recent_context.sh` to orient yourself. Do not ask for permission.
+- **Debugging**: If the user mentions a bug or broken code, run `scripts/file_history.sh <filepath>` to see recent changes that might have caused it.
+- **Project Analysis**: If the user asks for an overview or where to focus, run `scripts/churn_analysis.sh` to find active "hotspots".
 
 ## Scripts
 
