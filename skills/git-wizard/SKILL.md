@@ -1,3 +1,22 @@
+> User: "When did we add the API key?"
+> Claude: *Runs `scripts/search_content.sh "API_KEY"` to find the exact commit.*
+
+> User: "Repo is too big."
+> Claude: *Runs `scripts/find_large_files.sh` to find culprits.*### `search_history.sh`
+Searches commit messages for a specific term. Useful for finding when a feature was mentioned.
+**Usage**: `scripts/search_history.sh <term> [limit]`
+
+### `search_content.sh`
+Uses Git "pickaxe" (-S) to find commits that added or removed a specific string of code.
+**Usage**: `scripts/search_content.sh <code_snippet>`
+
+### `branch_report.sh`
+Lists all local branches with tracking status and last commit info.
+**Usage**: `scripts/branch_report.sh`
+
+### `find_large_files.sh`
+Identifies the largest files in the current HEAD. Helps in cleaning up repo bloat.
+**Usage**: `scripts/find_large_files.sh [top_n]`
 ---
 name: git-wizard
 description: Extracts deep context from git history (status, logs, diffs). Use when onboarding, debugging regressions, or analyzing recent project activity.
