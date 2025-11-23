@@ -665,14 +665,6 @@ When using 'apply_udiff', provide a unified diff.
 
 			if resp.StatusCode != http.StatusOK {
 				fmt.Printf("API Error (Status %d): %s\n", resp.StatusCode, string(body))
-				fmt.Println("\n--- Request Context ---")
-				var prettyJSON bytes.Buffer
-				if err := json.Indent(&prettyJSON, jsonData, "", "  "); err == nil {
-					fmt.Println(prettyJSON.String())
-				} else {
-					fmt.Println(string(jsonData))
-				}
-				fmt.Println("-----------------------")
 				break
 			}
 
@@ -1533,7 +1525,7 @@ friendly reminder: Please summarize the conversation history above based on the 
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API Error (Status %d): %s\nRequest: %s", resp.StatusCode, string(body), string(jsonData))
+		return "", fmt.Errorf("API Error (Status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var chatResp ChatCompletionResponse
@@ -1617,7 +1609,7 @@ func generateCommitMessage(apiKey string, history []Message) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API Error (Status %d): %s\nRequest: %s", resp.StatusCode, string(body), string(jsonData))
+		return "", fmt.Errorf("API Error (Status %d): %s", resp.StatusCode, string(body))
 	}
 
 	var chatResp ChatCompletionResponse
