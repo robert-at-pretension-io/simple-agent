@@ -1130,18 +1130,26 @@ func summarizeContext(apiKey string, history []Message, task, future, vital stri
 		}
 	}
 
-	prompt := fmt.Sprintf(`Please summarize the provided conversation history, adhering to the following constraints:
-
-1. **Current Task**: %s
+	instructions := fmt.Sprintf(`1. **Current Task**: %s
 2. **Future Plans**: %s
 3. **Vital Information**: %s
 
 Ensure the summary is concise but retains all information necessary to continue working on the task and future plans.
-Preserve code snippets or specific data mentioned in "Vital Information".
+Preserve code snippets or specific data mentioned in "Vital Information".`, task, future, vital)
+
+	prompt := fmt.Sprintf(`You are an expert technical assistant.
+The user wants to shorten the conversation context.
+Please summarize the provided conversation history, adhering to the following constraints:
+
+%s
 
 Conversation History:
 %s
-`, task, future, vital, historyBuf.String())
+
+---
+IMPORTANT: Please summarize the conversation history above based on the following constraints:
+%s
+`, instructions, historyBuf.String(), instructions)
 
 	reqBody := ChatCompletionRequest{
 		Model: ModelName,
