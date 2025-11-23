@@ -1135,7 +1135,8 @@ func printThought(extraContent json.RawMessage) {
 		} `json:"google"`
 	}
 	if err := json.Unmarshal(extraContent, &content); err == nil && content.Google.Thought != "" {
-		fmt.Printf("\033[90m[Thought] %s\033[0m\n", content.Google.Thought)
+		fmt.Printf("\033[90m[Thought]\033[0m\n")
+		printMarkdown(content.Google.Thought)
 	}
 }
 
@@ -1144,7 +1145,8 @@ func extractAndPrintThoughts(content string) string {
 	matches := re.FindAllStringSubmatch(content, -1)
 	for _, match := range matches {
 		if len(match) > 1 {
-			fmt.Printf("\033[90m[Thought] %s\033[0m\n", strings.TrimSpace(match[1]))
+			fmt.Printf("\033[90m[Thought]\033[0m\n")
+			printMarkdown(strings.TrimSpace(match[1]))
 		}
 	}
 	return re.ReplaceAllString(content, "")
