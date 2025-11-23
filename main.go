@@ -238,10 +238,9 @@ type Skill struct {
 	Hooks          map[string]string
 }
 
-var supportedHooks = []string{"startup", "pre_edit", "post_edit", "pre_view", "post_view", "pre_run", "post_run", "pre_commit"}
+// var supportedHooks = []string{"startup", "pre_edit", "post_edit", "pre_view", "post_view", "pre_run", "post_run", "pre_commit"}
 
 func getSkillsExplanation() string {
-	hooksList := strings.Join(supportedHooks, ", ")
 	return `
 # Skills System Philosophy
 
@@ -851,6 +850,9 @@ When using 'apply_udiff', provide a unified diff.
 							if err != nil {
 								toolErr = fmt.Errorf("failed to summarize: %v", err)
 							} else {
+								if strings.TrimSpace(summary) == "" {
+									summary = "(No summary provided by the model)"
+								}
 								// Reset context
 								sysMsg := messages[0]
 								messages = []Message{sysMsg}
@@ -878,11 +880,13 @@ When using 'apply_udiff', provide a unified diff.
 						content = fmt.Sprintf("Error: %v", toolErr)
 					}
 
-					messages = append(messages, Message{
-						Role:       "tool",
-						Content:    content,
-						ToolCallID: toolCall.ID,
-					})
+					if !contextReset {
+						messages = append(messages, Message{
+							Role:       "tool",
+							Content:    content,
+							ToolCallID: toolCall.ID,
+						})
+					}
 				}
 
 				if contextReset {
