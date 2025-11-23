@@ -30,11 +30,11 @@ type ChatCompletionRequest struct {
 }
 
 type Message struct {
-	Role         string          `json:"role"`
-	Content      string          `json:"content,omitempty"`
-	ToolCalls    []ToolCall      `json:"tool_calls,omitempty"`
-	ToolCallID   string          `json:"tool_call_id,omitempty"`
-	ExtraContent json.RawMessage `json:"extra_content,omitempty"`
+	Role         string           `json:"role"`
+	Content      string           `json:"content,omitempty"`
+	ToolCalls    []ToolCall       `json:"tool_calls,omitempty"`
+	ToolCallID   string           `json:"tool_call_id,omitempty"`
+	ExtraContent json.RawMessage  `json:"extra_content,omitempty"`
 }
 
 type Tool struct {
@@ -180,12 +180,13 @@ type Skill struct {
 	Description    string
 	Path           string
 	DefinitionFile string
+	Hooks          map[string]string
 }
 
 var skillsExplanation = `
 # Skills System Philosophy
 
-You have the ability to discover, create and use "Skills". Skills are specialized capabilities defined in files within the 'skills' directory.
+You have the ability to discover and use "Skills". Skills are specialized capabilities defined in files within the 'skills' directory.
 
 ## Purpose
 Skills bridge the gap between general reasoning and specific, repeatable tasks. They allow you to:
@@ -198,6 +199,7 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
 1.  **` + "`SKILL.md`" + `**: The instruction manual.
     - Must start with YAML frontmatter defining ` + "`name`" + ` and ` + "`description`" + `.
     - The body contains Markdown instructions for you to follow.
+    - Can optionally define **hooks** in frontmatter to trigger scripts on system events (e.g., ` + "`post_edit`" + `).
 2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts (Python, Bash, etc.).
     - Prefer using scripts over complex manual steps in ` + "`SKILL.md`" + `.
 
@@ -253,11 +255,15 @@ func parseSkill(path string) (Skill, error) {
 
 	scanner := bufio.NewScanner(f)
 	var name, description string
+	hooks := make(map[string]string)
 	inFrontmatter := false
+	inHooks := false
 	lineCount := 0
 
 	for scanner.Scan() {
 		line := scanner.Text()
+		trimmedLine := strings.TrimSpace(line)
+
 		if line == "---" {
 			if lineCount == 0 {
 				inFrontmatter = true
@@ -270,10 +276,32 @@ func parseSkill(path string) (Skill, error) {
 		}
 
 		if inFrontmatter {
-			if strings.HasPrefix(line, "name:") {
-				name = strings.TrimSpace(strings.TrimPrefix(line, "name:"))
-			} else if strings.HasPrefix(line, "description:") {
-				description = strings.TrimSpace(strings.TrimPrefix(line, "description:"))
+			if trimmedLine == "hooks:" {
+				inHooks = true
+				continue
+			}
+
+			if inHooks {
+				// Check if we are still in hooks (indented)
+				if strings.HasPrefix(line, "  ") || strings.HasPrefix(line, "\t") {
+					parts := strings.SplitN(trimmedLine, ":", 2)
+					if len(parts) == 2 {
+						key := strings.TrimSpace(parts[0])
+						val := strings.TrimSpace(parts[1])
+						hooks[key] = val
+					}
+				} else if trimmedLine != "" {
+					// Not empty and not indented, so we left hooks
+					inHooks = false
+				}
+			}
+
+			if !inHooks {
+				if strings.HasPrefix(line, "name:") {
+					name = strings.TrimSpace(strings.TrimPrefix(line, "name:"))
+				} else if strings.HasPrefix(line, "description:") {
+					description = strings.TrimSpace(strings.TrimPrefix(line, "description:"))
+				}
 			}
 		}
 		lineCount++
@@ -291,6 +319,7 @@ func parseSkill(path string) (Skill, error) {
 		Description:    description,
 		Path:           absPath,
 		DefinitionFile: defFile,
+		Hooks:          hooks,
 	}, nil
 }
 
@@ -310,6 +339,32 @@ func generateSkillsPrompt(skills []Skill) string {
 	return sb.String()
 }
 
+func runSkillHooks(skills []Skill, event string, context map[string]string) string {
+	var output strings.Builder
+	for _, skill := range skills {
+		if cmdTemplate, ok := skill.Hooks[event]; ok {
+			// Prepare command
+			cmdStr := cmdTemplate
+			// Replace {skill_path}
+			cmdStr = strings.ReplaceAll(cmdStr, "{skill_path}", skill.Path)
+			// Replace context variables
+			for k, v := range context {
+				cmdStr = strings.ReplaceAll(cmdStr, "{"+k+"}", v)
+			}
+
+			fmt.Printf("[Hook: %s] Running for skill '%s': %s\n", event, skill.Name, cmdStr)
+			out, err := runScript(cmdStr)
+			if err != nil {
+				fmt.Printf("[Hook Error] %v\n", err)
+				output.WriteString(fmt.Sprintf("Hook '%s' (skill: %s) failed: %v\n", event, skill.Name, err))
+			} else if out != "" {
+				output.WriteString(fmt.Sprintf("Hook '%s' (skill: %s) output:\n%s\n", event, skill.Name, out))
+			}
+		}
+	}
+	return output.String()
+}
+
 // --- Main ---
 
 func main() {
@@ -322,6 +377,9 @@ func main() {
 	// Discover skills
 	skills := discoverSkills("./skills")
 	skillsPrompt := generateSkillsPrompt(skills)
+
+	// Run startup hooks
+	runSkillHooks(skills, "startup", nil)
 
 	baseSystemPrompt := `Act as an expert software developer.
 You have access to tools to edit files, read files, list files, search files, and execute scripts.
@@ -447,10 +505,19 @@ When using 'apply_udiff', provide a unified diff.
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
+							// Pre-edit hook
+							runSkillHooks(skills, "pre_edit", map[string]string{"path": args.Path})
+
 							toolResult, toolErr = applyUDiff(args.Path, args.Diff)
 							if toolErr == nil {
 								fmt.Printf("Successfully applied diff to %s\n", args.Path)
 								toolResult = "Diff applied successfully."
+							}
+
+							// Post-edit hook
+							hookOut := runSkillHooks(skills, "post_edit", map[string]string{"path": args.Path})
+							if hookOut != "" {
+								toolResult += "\n\n[Hook Output]\n" + hookOut
 							}
 						}
 
@@ -462,8 +529,17 @@ When using 'apply_udiff', provide a unified diff.
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
+							// Pre-view hook
+							runSkillHooks(skills, "pre_view", map[string]string{"path": args.Path})
+
 							fmt.Printf("Reading file: %s\n", args.Path)
 							toolResult, toolErr = readFile(args.Path)
+
+							// Post-view hook
+							hookOut := runSkillHooks(skills, "post_view", map[string]string{"path": args.Path})
+							if hookOut != "" {
+								toolResult += "\n\n[Hook Output]\n" + hookOut
+							}
 						}
 
 					case "run_script":
