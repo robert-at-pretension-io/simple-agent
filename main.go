@@ -259,7 +259,7 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
     - Can optionally define **hooks** in frontmatter to trigger scripts on system events.
       Supported hooks: ` + hooksList + `.
       **Note**: Hooks must refer to a script file within the skill's ` + "`scripts`" + ` directory. They are executed directly.
-2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts (Python, Bash, etc.).
+2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts -- note that scripts are all invoked with sh -c [script_path_here] .
     - Prefer using scripts over complex manual steps in ` + "`SKILL.md`" + `.
 
 ## How to Invoke Skills
@@ -267,13 +267,13 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
 2.  **Learn**: If a user request matches a skill, use 'read_file' to read its 'SKILL.md'.
 3.  **Execute**: Follow the instructions in 'SKILL.md'.
     - If the instructions refer to scripts, execute them using 'run_script'.
-    - Scripts are typically located relative to the skill directory (e.g., ` + "`skills/my-skill/scripts/script.py`" + `).
+    - Scripts are typically located relative to the skill directory (e.g., ` + "`skills/my-skill/scripts/script.sh`" + `).
 
 ## Creating and Managing Skills
 You can also create new skills to solve problems!
 1.  **Create Directory**: Create a new folder in ` + "`skills/`" + `.
 2.  **Define Skill**: Create ` + "`SKILL.md`" + ` with frontmatter and instructions.
-3.  **Add Scripts**: Create a ` + "`scripts/`" + ` folder and add any necessary scripts.
+3.  **Add Scripts**: Create a ` + "`scripts/`" + ` folder and add any necessary scripts. Note that all scripts will be invoked with sh -c [your script here], so keep that in mind when writing the script.
 
 **Best Practices**:
 - **Specific vs. General**: Create specific skills for complex, recurring problems. However, prefer general skills that can be reused.
