@@ -30,11 +30,11 @@ type ChatCompletionRequest struct {
 }
 
 type Message struct {
-	Role         string           `json:"role"`
-	Content      string           `json:"content,omitempty"`
-	ToolCalls    []ToolCall       `json:"tool_calls,omitempty"`
-	ToolCallID   string           `json:"tool_call_id,omitempty"`
-	ExtraContent json.RawMessage  `json:"extra_content,omitempty"`
+	Role         string          `json:"role"`
+	Content      string          `json:"content,omitempty"`
+	ToolCalls    []ToolCall      `json:"tool_calls,omitempty"`
+	ToolCallID   string          `json:"tool_call_id,omitempty"`
+	ExtraContent json.RawMessage `json:"extra_content,omitempty"`
 }
 
 type Tool struct {
@@ -1130,9 +1130,7 @@ func summarizeContext(apiKey string, history []Message, task, future, vital stri
 		}
 	}
 
-	prompt := fmt.Sprintf(`You are an expert technical assistant.
-The user wants to shorten the conversation context.
-Please summarize the provided conversation history, adhering to the following constraints:
+	prompt := fmt.Sprintf(`Please summarize the provided conversation history, adhering to the following constraints:
 
 1. **Current Task**: %s
 2. **Future Plans**: %s
