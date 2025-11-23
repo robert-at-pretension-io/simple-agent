@@ -1,3 +1,11 @@
+### `check_security.sh`
+Checks for known vulnerabilities using `govulncheck` or `gosec` if installed.
+
+### `check_coverage.sh`
+Runs Go tests with coverage profiling and displays function-level coverage statistics.
+
+### `check_fmt_diff.sh`
+Runs `gofmt -d` to show formatting differences without modifying the files. Useful for previewing changes.
 ---
 name: linter
 description: Run static analysis and style checks to ensure code quality and formatting.
