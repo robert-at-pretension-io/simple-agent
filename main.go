@@ -296,6 +296,9 @@ You can also create new skills to solve problems!
 - **Self-Contained**: A skill should include everything needed to run it.
 - **Automate with Hooks**: Whenever possible, use hooks to run validation (linting, testing) automatically rather than writing manual instructions.
 - **Invocation**: Hooks must specify a script path (relative to the skill directory) and arguments.
+- **Extended Resources**: If a skill needs long prompts, templates, or static data, store them in files within the skill directory and read them as needed.
+- **Protective & Defensive**: **Do not assume** the user has specific system tools (like ` + "`jq`" + `, ` + "`aws`" + `, ` + "`npm`" + `) installed. Check for them or use standard, widely available tools.
+- **Project Agnostic**: **Do not assume** the project uses a specific language (e.g., Go, TS). Dynamically detect the environment (e.g., check for ` + "`go.mod`" + ` vs ` + "`package.json`" + `) before executing language-specific logic.
 
 When faced with a new, complex task that might be repeated, consider creating a new skill for it.
 `
