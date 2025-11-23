@@ -1,6 +1,6 @@
 ---
 name: git-wizard
-description: Advanced git intelligence tools to help the agent understand project history, context, and recent activity.
+description: Extracts deep context from git history (status, logs, diffs). Use when onboarding, debugging regressions, or analyzing recent project activity.
 version: 1.0.0
 dependencies:
   - git

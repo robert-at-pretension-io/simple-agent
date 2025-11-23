@@ -1,8 +1,9 @@
-hooks:
-  post_edit: scripts/lint.sh---
-name: Linter
+---
+name: linter
 description: Run static analysis and style checks to ensure code quality and formatting.
 version: 1.0.0
+hooks:
+  post_edit: scripts/lint.sh
 dependencies:
   - go
 ---
