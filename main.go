@@ -1,7 +1,3 @@
-	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
-		return "", fmt.Errorf("failed to create directory: %w", err)
-	}
 package main
 
 import (
@@ -1215,6 +1211,11 @@ func applyUDiff(ctx context.Context, path string, diff string, dryRun bool) (str
 
 	if dryRun {
 		return newContent, nil
+	}
+
+	// Ensure directory exists
+	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Write back to file
