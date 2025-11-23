@@ -109,6 +109,14 @@ var readFileTool = Tool{
 				"path": {
 					"type": "string",
 					"description": "The path to the file to read"
+				},
+				"start_line": {
+					"type": "integer",
+					"description": "The line number to start reading from (1-based, optional)"
+				},
+				"end_line": {
+					"type": "integer",
+					"description": "The line number to stop reading at (1-based, inclusive, optional)"
 				}
 			},
 			"required": ["path"]
@@ -543,7 +551,9 @@ When using 'apply_udiff', provide a unified diff.
 					case "read_file":
 						fmt.Printf("[Tool Call: read_file]\n")
 						var args struct {
-							Path string `json:"path"`
+							Path      string `json:"path"`
+							StartLine int    `json:"start_line"`
+							EndLine   int    `json:"end_line"`
 						}
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
@@ -551,8 +561,8 @@ When using 'apply_udiff', provide a unified diff.
 							// Pre-view hook
 							runSkillHooks(skills, "pre_view", map[string]string{"path": args.Path})
 
-							fmt.Printf("Reading file: %s\n", args.Path)
-							toolResult, toolErr = readFile(args.Path)
+							fmt.Printf("Reading file: %s (lines %d-%d)\n", args.Path, args.StartLine, args.EndLine)
+							toolResult, toolErr = readFile(args.Path, args.StartLine, args.EndLine)
 
 							// Post-view hook
 							hookOut := runSkillHooks(skills, "post_view", map[string]string{"path": args.Path})
@@ -660,12 +670,30 @@ When using 'apply_udiff', provide a unified diff.
 
 // --- Tool Implementations ---
 
-func readFile(path string) (string, error) {
+func readFile(path string, startLine, endLine int) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
-	return string(data), nil
+	content := string(data)
+
+	if startLine == 0 && endLine == 0 {
+		return content, nil
+	}
+
+	lines := strings.Split(content, "\n")
+	if startLine < 1 {
+		startLine = 1
+	}
+	if endLine == 0 || endLine > len(lines) {
+		endLine = len(lines)
+	}
+
+	if startLine > endLine || startLine > len(lines) {
+		return "", fmt.Errorf("invalid line range: %d-%d (file has %d lines)", startLine, endLine, len(lines))
+	}
+
+	return strings.Join(lines[startLine-1:endLine], "\n"), nil
 }
 
 func execShellCommand(command string) (string, error) {
