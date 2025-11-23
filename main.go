@@ -435,8 +435,7 @@ func main() {
 	// Run startup hooks
 	runSkillHooks(skills, "startup", nil)
 
-	baseSystemPrompt := `Act as an expert software developer.
-You have access to tools to edit files, read files, list files, search files, and execute scripts.
+	baseSystemPrompt := `You have access to tools to edit files, read files, list files, search files, and execute scripts.
 When using 'apply_udiff', provide a unified diff.
 - Start hunks with '@@ ... @@'
 - Use ' ' for context, '-' for removal, '+' for addition.
