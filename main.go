@@ -120,16 +120,23 @@ var runScriptTool = Tool{
 	Type: "function",
 	Function: FunctionDefinition{
 		Name:        "run_script",
-		Description: "Execute a command line script or shell command.",
+		Description: "Execute a script from a skill's scripts directory.",
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"properties": {
-				"command": {
+				"path": {
 					"type": "string",
-					"description": "The command to execute (e.g., 'python scripts/analyze.py' or 'ls -la')"
+					"description": "The path to the script to execute (must be within a 'scripts' directory of a skill)"
+				},
+				"args": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "Arguments to pass to the script"
 				}
 			},
-			"required": ["command"]
+			"required": ["path"]
 		}`),
 	},
 }
@@ -359,7 +366,7 @@ func runSkillHooks(skills []Skill, event string, context map[string]string) stri
 			}
 
 			fmt.Printf("[Hook: %s] Running for skill '%s': %s\n", event, skill.Name, cmdStr)
-			out, err := runScript(cmdStr)
+			out, err := execShellCommand(cmdStr)
 			if err != nil {
 				fmt.Printf("[Hook Error] %v\n", err)
 				output.WriteString(fmt.Sprintf("Hook '%s' (skill: %s) failed: %v\n", event, skill.Name, err))
@@ -551,13 +558,14 @@ When using 'apply_udiff', provide a unified diff.
 					case "run_script":
 						fmt.Printf("[Tool Call: run_script]\n")
 						var args struct {
-							Command string `json:"command"`
+							Path string   `json:"path"`
+							Args []string `json:"args"`
 						}
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
-							fmt.Printf("Executing: %s\n", args.Command)
-							toolResult, toolErr = runScript(args.Command)
+							fmt.Printf("Executing script: %s %v\n", args.Path, args.Args)
+							toolResult, toolErr = runSafeScript(args.Path, args.Args)
 						}
 
 					case "list_files":
@@ -623,12 +631,69 @@ func readFile(path string) (string, error) {
 	return string(data), nil
 }
 
-func runScript(command string) (string, error) {
+func execShellCommand(command string) (string, error) {
 	// Using sh -c to allow for shell features (pipes, etc) and script execution
 	cmd := exec.Command("sh", "-c", command)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), fmt.Errorf("command failed: %w\nOutput:\n%s", err, string(out))
+	}
+	return string(out), nil
+}
+
+func runSafeScript(scriptPath string, args []string) (string, error) {
+	// Validate path
+	absPath, err := filepath.Abs(scriptPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid path: %w", err)
+	}
+
+	// Check if file exists
+	info, err := os.Stat(absPath)
+	if err != nil {
+		return "", fmt.Errorf("script not found: %w", err)
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("path is a directory, not a file")
+	}
+
+	// Check if it is inside a "scripts" folder within "skills"
+	cwd, _ := os.Getwd()
+	skillsDir := filepath.Join(cwd, "skills")
+
+	if !strings.HasPrefix(absPath, skillsDir) {
+		return "", fmt.Errorf("script must be inside the 'skills' directory")
+	}
+
+	// Check for 'scripts' in the path components
+	// We use string(os.PathSeparator) to be cross-platform
+	sep := string(os.PathSeparator)
+	if !strings.Contains(absPath, sep+"scripts"+sep) {
+		return "", fmt.Errorf("script must be inside a 'scripts' folder")
+	}
+
+	// Determine execution method
+	var cmd *exec.Cmd
+	ext := filepath.Ext(absPath)
+
+	switch ext {
+	case ".py":
+		cmdArgs := append([]string{absPath}, args...)
+		cmd = exec.Command("python", cmdArgs...)
+	case ".sh":
+		cmdArgs := append([]string{absPath}, args...)
+		cmd = exec.Command("bash", cmdArgs...)
+	case ".js":
+		cmdArgs := append([]string{absPath}, args...)
+		cmd = exec.Command("node", cmdArgs...)
+	default:
+		// Try to execute directly
+		cmd = exec.Command(absPath, args...)
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(out), fmt.Errorf("script execution failed: %w\nOutput:\n%s", err, string(out))
 	}
 	return string(out), nil
 }
