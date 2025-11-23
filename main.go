@@ -67,6 +67,13 @@ type ToolCallFunction struct {
 type ChatCompletionResponse struct {
 	Choices []Choice  `json:"choices"`
 	Error   *APIError `json:"error,omitempty"`
+	Usage   *Usage    `json:"usage,omitempty"`
+}
+
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
 }
 
 type APIError struct {
@@ -487,30 +494,39 @@ When using 'apply_udiff', provide a unified diff.
 
 	client := &http.Client{}
 
+	var pendingInput string
+
 	for {
-		fmt.Print("> ")
-		var inputLines []string
-		for {
-			line, err := reader.ReadString('\n')
-			if line != "" {
-				inputLines = append(inputLines, strings.TrimRight(line, "\r\n"))
+		var input string
+		if pendingInput != "" {
+			fmt.Printf("> %s\n", pendingInput)
+			input = pendingInput
+			pendingInput = ""
+		} else {
+			fmt.Print("> ")
+			var inputLines []string
+			for {
+				line, err := reader.ReadString('\n')
+				if line != "" {
+					inputLines = append(inputLines, strings.TrimRight(line, "\r\n"))
+				}
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					fmt.Printf("Error reading input: %v\n", err)
+					os.Exit(1)
+				}
 			}
-			if err == io.EOF {
+
+			if len(inputLines) == 0 {
 				break
 			}
-			if err != nil {
-				fmt.Printf("Error reading input: %v\n", err)
-				os.Exit(1)
+
+			input = strings.Join(inputLines, "\n")
+			if strings.TrimSpace(input) == "" {
+				continue
 			}
-		}
-
-		if len(inputLines) == 0 {
-			break
-		}
-
-		input := strings.Join(inputLines, "\n")
-		if strings.TrimSpace(input) == "" {
-			continue
 		}
 
 		// Capture the start index of the current turn's messages
@@ -526,6 +542,8 @@ When using 'apply_udiff', provide a unified diff.
 		mu.Lock()
 		currentCancel = cancel
 		mu.Unlock()
+
+		var lastUsage int
 
 		// Interaction loop (handle tool calls)
 		for {
@@ -591,6 +609,10 @@ When using 'apply_udiff', provide a unified diff.
 			if len(chatResp.Choices) == 0 {
 				fmt.Println("No choices returned from API")
 				break
+			}
+
+			if chatResp.Usage != nil {
+				lastUsage = chatResp.Usage.TotalTokens
 			}
 
 			msg := chatResp.Choices[0].Message
@@ -852,6 +874,16 @@ When using 'apply_udiff', provide a unified diff.
 						fmt.Println("Changes committed successfully.")
 					}
 				}
+			}
+		}
+
+		// Check token usage
+		if lastUsage > 400000 && len(messages) > 2 {
+			fmt.Printf("\n[System] Context size is %d tokens (>400,000).\n", lastUsage)
+			fmt.Print("Would you like to ask the model to shorten the context? [y/N]: ")
+			confirm, _ := reader.ReadString('\n')
+			if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
+				pendingInput = "The context size has exceeded 400,000 tokens. Please use the 'shorten_context' tool to summarize the conversation and reset the context."
 			}
 		}
 	}
