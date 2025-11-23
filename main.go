@@ -258,7 +258,7 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
     - The body contains Markdown instructions for you to follow.
     - Can optionally define **hooks** in frontmatter to trigger scripts on system events.
       Supported hooks: ` + hooksList + `.
-      **Note**: Hooks are executed using ` + "`sh -c`" + `, so you can use shell features (pipes, redirects, environment variables).
+      **Note**: Hooks must refer to a script file within the skill's ` + "`scripts`" + ` directory. They are executed directly.
 2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts (Python, Bash, etc.).
     - Prefer using scripts over complex manual steps in ` + "`SKILL.md`" + `.
 
@@ -280,7 +280,7 @@ You can also create new skills to solve problems!
 - **Auditing**: If you find too many specific skills cluttering the system, suggest consolidating them or removing obsolete ones.
 - **Concise**: Only add necessary context in ` + "`SKILL.md`" + `.
 - **Self-Contained**: A skill should include everything needed to run it.
-- **Invocation**: Hooks are invoked using ` + "`sh -c`" + `. Ensure your command strings are compatible.
+- **Invocation**: Hooks must specify a script path (relative to the skill directory) and arguments.
 
 When faced with a new, complex task that might be repeated, consider creating a new skill for it.
 `
@@ -413,8 +413,23 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 				cmdStr = strings.ReplaceAll(cmdStr, "{"+k+"}", v)
 			}
 
-			fmt.Printf("[Hook: %s] Running for skill '%s': %s\n", event, skill.Name, cmdStr)
-			out, err := execShellCommand(ctx, cmdStr)
+			// Parse command string into script path and args
+			parts := strings.Fields(cmdStr)
+			if len(parts) == 0 {
+				continue
+			}
+			scriptPath := parts[0]
+			args := parts[1:]
+
+			// Resolve relative paths to skill directory
+			if !filepath.IsAbs(scriptPath) {
+				scriptPath = filepath.Join(skill.Path, scriptPath)
+			}
+
+			fmt.Printf("[Hook: %s] Running for skill '%s': %s %v\n", event, skill.Name, scriptPath, args)
+
+			// Use runSafeScript to enforce security and execution logic
+			out, err := runSafeScript(ctx, scriptPath, args, "")
 			if err != nil {
 				fmt.Printf("[Hook Error] %v\n", err)
 				output.WriteString(fmt.Sprintf("Hook '%s' (skill: %s) failed: %v\n", event, skill.Name, err))
@@ -982,16 +997,6 @@ func readFile(ctx context.Context, path string, startLine, endLine int) (string,
 	}
 
 	return strings.Join(lines[startLine-1:endLine], "\n"), nil
-}
-
-func execShellCommand(ctx context.Context, command string) (string, error) {
-	// Using sh -c to allow for shell features (pipes, etc) and script execution
-	cmd := exec.CommandContext(ctx, "sh", "-c", command)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return string(out), fmt.Errorf("command failed: %w\nOutput:\n%s", err, string(out))
-	}
-	return string(out), nil
 }
 
 func runSafeScript(ctx context.Context, scriptPath string, args []string, skillsPrompt string) (string, error) {
