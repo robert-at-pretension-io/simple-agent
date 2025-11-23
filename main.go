@@ -560,35 +560,41 @@ When using 'apply_udiff', provide a unified diff.
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
-							// Show diff to user
-							fmt.Printf("Proposed changes to %s:\n", args.Path)
-							printColoredDiff(args.Diff)
-
-							// Ask for confirmation
-							fmt.Print("Apply these changes? [y/N]: ")
-							var confirm string
-							if scanner.Scan() {
-								confirm = scanner.Text()
-							}
-
-							if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
-								// Pre-edit hook
-								runSkillHooks(skills, "pre_edit", map[string]string{"path": args.Path})
-
-								toolResult, toolErr = applyUDiff(args.Path, args.Diff)
-								if toolErr == nil {
-									fmt.Printf("Successfully applied diff to %s\n", args.Path)
-									toolResult = "Diff applied successfully."
-								}
-
-								// Post-edit hook
-								hookOut := runSkillHooks(skills, "post_edit", map[string]string{"path": args.Path})
-								if hookOut != "" {
-									toolResult += "\n\n[Hook Output]\n" + hookOut
-								}
+							// Dry run first to check validity and generate helpful errors
+							_, err := applyUDiff(args.Path, args.Diff, true)
+							if err != nil {
+								toolErr = err
 							} else {
-								fmt.Println("Changes rejected.")
-								toolResult = "User rejected the changes."
+								// Show diff to user
+								fmt.Printf("Proposed changes to %s:\n", args.Path)
+								printColoredDiff(args.Diff)
+
+								// Ask for confirmation
+								fmt.Print("Apply these changes? [y/N]: ")
+								var confirm string
+								if scanner.Scan() {
+									confirm = scanner.Text()
+								}
+
+								if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
+									// Pre-edit hook
+									runSkillHooks(skills, "pre_edit", map[string]string{"path": args.Path})
+
+									toolResult, toolErr = applyUDiff(args.Path, args.Diff, false)
+									if toolErr == nil {
+										fmt.Printf("Successfully applied diff to %s\n", args.Path)
+										toolResult = "Diff applied successfully."
+									}
+
+									// Post-edit hook
+									hookOut := runSkillHooks(skills, "post_edit", map[string]string{"path": args.Path})
+									if hookOut != "" {
+										toolResult += "\n\n[Hook Output]\n" + hookOut
+									}
+								} else {
+									fmt.Println("Changes rejected.")
+									toolResult = "User rejected the changes."
+								}
 							}
 						}
 
@@ -959,7 +965,7 @@ func searchFiles(root string, pattern string) (string, error) {
 }
 
 // applyUDiff applies a unified diff to a file
-func applyUDiff(path string, diff string) (string, error) {
+func applyUDiff(path string, diff string, dryRun bool) (string, error) {
 	absPath, err := validatePath(path)
 	if err != nil {
 		return "", err
@@ -987,7 +993,7 @@ func applyUDiff(path string, diff string) (string, error) {
 
 	// Apply hunks
 	newContent := content
-	for _, hunk := range hunks {
+	for i, hunk := range hunks {
 		// Create search block
 		searchBlock := strings.Join(hunk.SearchLines, "\n")
 		replaceBlock := strings.Join(hunk.ReplaceLines, "\n")
@@ -1000,11 +1006,34 @@ func applyUDiff(path string, diff string) (string, error) {
 
 		// Check if search block exists
 		if !strings.Contains(newContent, searchBlock) {
-			return "", fmt.Errorf("hunk failed to apply: context not found.\nSearch Block:\n%s", searchBlock)
+			// Fuzzy search for error reporting
+			fileLines := strings.Split(newContent, "\n")
+			bestIdx, score := findBestMatch(fileLines, hunk.SearchLines)
+
+			// Threshold for suggestion (e.g. 50% match)
+			if bestIdx != -1 && score > 0.5 {
+				start := bestIdx - 5
+				if start < 0 {
+					start = 0
+				}
+				end := bestIdx + len(hunk.SearchLines) + 5
+				if end > len(fileLines) {
+					end = len(fileLines)
+				}
+
+				snippet := strings.Join(fileLines[start:end], "\n")
+				return "", fmt.Errorf("hunk %d failed to apply: context not found.\nProbable match found at lines %d-%d (score %.2f):\n```\n%s\n```\nPlease verify the context lines and try again.", i+1, start+1, end, score, snippet)
+			}
+
+			return "", fmt.Errorf("hunk %d failed to apply: context not found.\nSearch Block:\n%s", i+1, searchBlock)
 		}
 
 		// Perform replacement (replace 1 occurrence)
 		newContent = strings.Replace(newContent, searchBlock, replaceBlock, 1)
+	}
+
+	if dryRun {
+		return newContent, nil
 	}
 
 	// Write back to file
@@ -1014,6 +1043,31 @@ func applyUDiff(path string, diff string) (string, error) {
 	}
 
 	return "Success", nil
+}
+
+func findBestMatch(fileLines []string, searchLines []string) (int, float64) {
+	if len(searchLines) == 0 || len(fileLines) < len(searchLines) {
+		return -1, 0.0
+	}
+
+	bestScore := 0.0
+	bestIdx := -1
+
+	for i := 0; i <= len(fileLines)-len(searchLines); i++ {
+		matches := 0
+		for j := 0; j < len(searchLines); j++ {
+			// Compare trimmed lines to be lenient on whitespace
+			if strings.TrimSpace(fileLines[i+j]) == strings.TrimSpace(searchLines[j]) {
+				matches++
+			}
+		}
+		score := float64(matches) / float64(len(searchLines))
+		if score > bestScore {
+			bestScore = score
+			bestIdx = i
+		}
+	}
+	return bestIdx, bestScore
 }
 
 type Hunk struct {
