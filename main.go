@@ -453,21 +453,37 @@ When using 'apply_udiff', provide a unified diff.
 		},
 	}
 
-	scanner := bufio.NewScanner(os.Stdin)
+	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("Welcome to Gemini REPL (%s)\n", ModelName)
 	if len(skills) > 0 {
 		fmt.Printf("Loaded %d skills from ./skills\n", len(skills))
 	}
-	fmt.Println("Type your message and press Enter. Ctrl+C to exit.")
+	fmt.Println("Type your message. Press Ctrl+D (or Ctrl+Z on Windows) on a new line to send. Ctrl+C to exit.")
 
 	client := &http.Client{}
 
 	for {
 		fmt.Print("> ")
-		if !scanner.Scan() {
+		var inputLines []string
+		for {
+			line, err := reader.ReadString('\n')
+			if line != "" {
+				inputLines = append(inputLines, strings.TrimRight(line, "\r\n"))
+			}
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				fmt.Printf("Error reading input: %v\n", err)
+				os.Exit(1)
+			}
+		}
+
+		if len(inputLines) == 0 {
 			break
 		}
-		input := scanner.Text()
+
+		input := strings.Join(inputLines, "\n")
 		if strings.TrimSpace(input) == "" {
 			continue
 		}
@@ -574,12 +590,10 @@ When using 'apply_udiff', provide a unified diff.
 
 								// Ask for confirmation
 								fmt.Print("Apply these changes? [y/N]: ")
-								var confirm string
-								if scanner.Scan() {
-									confirm = scanner.Text()
-								}
+								confirm, _ := reader.ReadString('\n')
+								confirm = strings.TrimSpace(confirm)
 
-								if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
+								if strings.ToLower(confirm) == "y" {
 									// Pre-edit hook
 									runSkillHooks(skills, "pre_edit", map[string]string{"path": args.Path})
 
@@ -773,11 +787,10 @@ When using 'apply_udiff', provide a unified diff.
 			} else {
 				fmt.Printf("\n[Git] Proposed commit message: %s\n", commitMsg)
 				fmt.Print("Commit these changes? [y/N]: ")
-				var confirm string
-				if scanner.Scan() {
-					confirm = scanner.Text()
-				}
-				if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
+				confirm, _ := reader.ReadString('\n')
+				confirm = strings.TrimSpace(confirm)
+
+				if strings.ToLower(confirm) == "y" {
 					if err := gitCommit(commitMsg); err != nil {
 						fmt.Printf("Git commit failed: %v\n", err)
 					} else {
@@ -1338,7 +1351,7 @@ func generateCommitMessage(apiKey string, history []Message) (string, error) {
 		}
 	}
 
-	systemPrompt := "Generate a tight git commit message describing the changes made in the provided conversation history. Output ONLY the commit message. Do not use markdown or quotes."
+	systemPrompt := "You are an expert developer. Generate a tight git commit message (less than 15 words) describing the changes made in the provided conversation history. Output ONLY the commit message. Do not use markdown or quotes."
 
 	reqBody := ChatCompletionRequest{
 		Model: FlashModelName,
