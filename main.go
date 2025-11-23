@@ -670,8 +670,40 @@ When using 'apply_udiff', provide a unified diff.
 
 // --- Tool Implementations ---
 
+// validatePath ensures the path is within the current working directory
+func validatePath(path string) (string, error) {
+	if path == "" {
+		path = "."
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get CWD: %w", err)
+	}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve absolute path: %w", err)
+	}
+
+	// Check if path is within CWD using filepath.Rel
+	rel, err := filepath.Rel(cwd, absPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to check path relation: %w", err)
+	}
+
+	if strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("access denied: path '%s' is outside the current working directory", path)
+	}
+
+	return absPath, nil
+}
+
 func readFile(path string, startLine, endLine int) (string, error) {
-	data, err := os.ReadFile(path)
+	absPath, err := validatePath(path)
+	if err != nil {
+		return "", err
+	}
+
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %w", err)
 	}
@@ -708,9 +740,9 @@ func execShellCommand(command string) (string, error) {
 
 func runSafeScript(scriptPath string, args []string) (string, error) {
 	// Validate path
-	absPath, err := filepath.Abs(scriptPath)
+	absPath, err := validatePath(scriptPath)
 	if err != nil {
-		return "", fmt.Errorf("invalid path: %w", err)
+		return "", err
 	}
 
 	// Check if file exists
@@ -764,10 +796,12 @@ func runSafeScript(scriptPath string, args []string) (string, error) {
 }
 
 func listFiles(path string) (string, error) {
-	if path == "" {
-		path = "."
+	absPath, err := validatePath(path)
+	if err != nil {
+		return "", err
 	}
-	entries, err := os.ReadDir(path)
+
+	entries, err := os.ReadDir(absPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to list directory: %w", err)
 	}
@@ -787,9 +821,11 @@ func listFiles(path string) (string, error) {
 }
 
 func searchFiles(root string, pattern string) (string, error) {
-	if root == "" {
-		root = "."
+	absPath, err := validatePath(root)
+	if err != nil {
+		return "", err
 	}
+
 	re, err := regexp.Compile(pattern)
 	if err != nil {
 		return "", fmt.Errorf("invalid regex: %w", err)
@@ -797,7 +833,7 @@ func searchFiles(root string, pattern string) (string, error) {
 	var sb strings.Builder
 	matchCount := 0
 
-	err = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(absPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -841,9 +877,14 @@ func searchFiles(root string, pattern string) (string, error) {
 
 // applyUDiff applies a unified diff to a file
 func applyUDiff(path string, diff string) (string, error) {
+	absPath, err := validatePath(path)
+	if err != nil {
+		return "", err
+	}
+
 	// Read original file
 	var content string
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(absPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return "", fmt.Errorf("failed to read file: %w", err)
@@ -884,7 +925,7 @@ func applyUDiff(path string, diff string) (string, error) {
 	}
 
 	// Write back to file
-	err = os.WriteFile(path, []byte(newContent), 0644)
+	err = os.WriteFile(absPath, []byte(newContent), 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to write file: %w", err)
 	}
