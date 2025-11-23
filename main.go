@@ -270,8 +270,10 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
       hooks:
         post_edit: scripts/lint.sh
         startup: scripts/check_deps.sh
-2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts -- note that scripts are all invoked with sh -c [script_path_here] .
-    - Prefer using scripts over complex manual steps in ` + "`SKILL.md`" + `.
+2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts.
+    - **Multiple Scripts**: You can include multiple scripts for different sub-tasks (e.g., ` + "`setup.sh`" + `, ` + "`validate.py`" + `).
+    - **Descriptive Names**: Give scripts clear, action-oriented names (e.g., ` + "`install_dependencies.sh`" + ` is better than ` + "`run.sh`" + `).
+    - **Invocation**: Scripts are invoked via ` + "`sh -c [path] [args]`" + `. Prefer scripts over complex manual steps in ` + "`SKILL.md`" + `.
 
 ## How to Invoke Skills
 1.  **Discover**: The system provides a list of available skills.
@@ -284,7 +286,9 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
 You can also create new skills to solve problems!
 1.  **Create Directory**: Create a new folder in ` + "`skills/`" + `.
 2.  **Define Skill**: Create ` + "`SKILL.md`" + ` with frontmatter and instructions.
-3.  **Add Scripts**: Create a ` + "`scripts/`" + ` folder and add any necessary scripts. Note that all scripts will be invoked with sh -c [your script here], so keep that in mind when writing the script.
+3.  **Add Scripts**: Create a ` + "`scripts/`" + ` folder.
+    - **Organize**: Split complex logic into multiple, focused scripts.
+    - **Naming**: Use descriptive names (e.g., ` + "`migrate_db.sh`" + `) to make the skill easier to understand and debug.
 
 **Best Practices**:
 - **Specific vs. General**: Create specific skills for complex, recurring problems. However, prefer general skills that can be reused.
