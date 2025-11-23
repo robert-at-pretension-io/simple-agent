@@ -183,7 +183,11 @@ type Skill struct {
 	Hooks          map[string]string
 }
 
-var skillsExplanation = `
+var supportedHooks = []string{"startup", "pre_edit", "post_edit", "pre_view", "post_view"}
+
+func getSkillsExplanation() string {
+	hooksList := strings.Join(supportedHooks, ", ")
+	return `
 # Skills System Philosophy
 
 You have the ability to discover and use "Skills". Skills are specialized capabilities defined in files within the 'skills' directory.
@@ -199,7 +203,8 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
 1.  **` + "`SKILL.md`" + `**: The instruction manual.
     - Must start with YAML frontmatter defining ` + "`name`" + ` and ` + "`description`" + `.
     - The body contains Markdown instructions for you to follow.
-    - Can optionally define **hooks** in frontmatter to trigger scripts on system events (e.g., ` + "`post_edit`" + `).
+    - Can optionally define **hooks** in frontmatter to trigger scripts on system events.
+      Supported hooks: ` + hooksList + `.
 2.  **` + "`scripts/`" + `** (Optional): A subdirectory for utility scripts (Python, Bash, etc.).
     - Prefer using scripts over complex manual steps in ` + "`SKILL.md`" + `.
 
@@ -224,6 +229,7 @@ You can also create new skills to solve problems!
 
 When faced with a new, complex task that might be repeated, consider creating a new skill for it.
 `
+}
 
 func discoverSkills(root string) []Skill {
 	var skills []Skill
@@ -391,7 +397,7 @@ When using 'apply_udiff', provide a unified diff.
 - Replace entire blocks/functions rather than small internal edits to ensure uniqueness.
 - If a file does not exist, treat it as empty for the 'before' state.
 `
-	systemPrompt := baseSystemPrompt + skillsExplanation + skillsPrompt
+	systemPrompt := baseSystemPrompt + getSkillsExplanation() + skillsPrompt
 
 	messages := []Message{
 		{
