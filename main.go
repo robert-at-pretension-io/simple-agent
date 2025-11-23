@@ -143,21 +143,21 @@ var runScriptTool = Tool{
 		Name:        "run_script",
 		Description: "Execute a script from a skill's scripts directory.",
 		Parameters: json.RawMessage(`{
-			"type": "object",
-			"properties": {
-				"path": {
-					"type": "string",
-					"description": "The path to the script to execute (must be within a 'scripts' directory of a skill)"
-				},
-				"args": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"description": "Arguments to pass to the script"
-				}
+	"type": "object",
+	"properties": {
+		"path": {
+			"type": "string",
+			"description": "The path to the script to execute (must be within a 'scripts' directory of a skill)"
+		},
+		"args": {
+			"type": "array",
+			"items": {
+				"type": "string"
 			},
-			"required": ["path"]
+			"description": "Arguments to pass to the script"
+		}
+	},
+	"required": ["path"]
 		}`),
 	},
 }
@@ -848,7 +848,7 @@ When using 'apply_udiff', provide a unified diff.
 
 					switch toolCall.Function.Name {
 					case "apply_udiff":
-						fmt.Printf("[Tool Call: apply_udiff]\n")
+						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: apply_udiff\033[0m\n")
 						var args struct {
 							Path string `json:"path"`
 							Diff string `json:"diff"`
@@ -897,7 +897,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "read_file":
-						fmt.Printf("[Tool Call: read_file]\n")
+						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: read_file\033[0m\n")
 						var args struct {
 							Path      string `json:"path"`
 							StartLine int    `json:"start_line"`
@@ -920,7 +920,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "run_script":
-						fmt.Printf("[Tool Call: run_script]\n")
+						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: run_script\033[0m\n")
 						var args struct {
 							Path string   `json:"path"`
 							Args []string `json:"args"`
@@ -942,7 +942,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "list_files":
-						fmt.Printf("[Tool Call: list_files]\n")
+						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: list_files\033[0m\n")
 						var args struct {
 							Path string `json:"path"`
 						}
@@ -954,7 +954,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "search_files":
-						fmt.Printf("[Tool Call: search_files]\n")
+						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: search_files\033[0m\n")
 						var args struct {
 							Path  string `json:"path"`
 							Regex string `json:"regex"`
@@ -967,7 +967,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "shorten_context":
-						fmt.Printf("[Tool Call: shorten_context]\n")
+						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: shorten_context\033[0m\n")
 						var args struct {
 							Task   string `json:"task_description"`
 							Future string `json:"future_plans"`
@@ -1062,7 +1062,7 @@ When using 'apply_udiff', provide a unified diff.
 			// No tool calls, just print response
 			cleanContent := extractAndPrintThoughts(msg.Content)
 			if strings.TrimSpace(cleanContent) != "" {
-				fmt.Println("Gemini:")
+				fmt.Printf("\n\033[1;34m🤖 Gemini:\033[0m\n")
 				printMarkdown(cleanContent)
 			}
 			break
@@ -1528,8 +1528,9 @@ func printThought(extraContent json.RawMessage) {
 		} `json:"google"`
 	}
 	if err := json.Unmarshal(extraContent, &content); err == nil && content.Google.Thought != "" {
-		fmt.Printf("\033[90m[Thought]\033[0m\n")
+		fmt.Printf("\n\033[90m─── [Thought] ───\033[0m\n")
 		printMarkdown(content.Google.Thought)
+		fmt.Printf("\033[90m───────────────────\033[0m\n")
 	}
 }
 
@@ -1538,8 +1539,9 @@ func extractAndPrintThoughts(content string) string {
 	matches := re.FindAllStringSubmatch(content, -1)
 	for _, match := range matches {
 		if len(match) > 1 {
-			fmt.Printf("\033[90m[Thought]\033[0m\n")
+			fmt.Printf("\n\033[90m─── [Thought] ───\033[0m\n")
 			printMarkdown(strings.TrimSpace(match[1]))
+			fmt.Printf("\033[90m───────────────────\033[0m\n")
 		}
 	}
 	return re.ReplaceAllString(content, "")
