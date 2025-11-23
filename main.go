@@ -238,7 +238,7 @@ type Skill struct {
 	Hooks          map[string]string
 }
 
-var supportedHooks = []string{"startup", "pre_edit", "post_edit", "pre_view", "post_view"}
+var supportedHooks = []string{"startup", "pre_edit", "post_edit", "pre_view", "post_view", "pre_run", "post_run", "pre_commit"}
 
 func getSkillsExplanation() string {
 	hooksList := strings.Join(supportedHooks, ", ")
@@ -263,6 +263,8 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
       **Supported Hooks**:
       - ` + "`startup`" + `: Runs at session start (e.g., dependency checks).
       - ` + "`pre_edit` / `post_edit`" + `: Runs before/after ` + "`apply_udiff`" + `. **Great for running linters/tests automatically.**
+      - ` + "`pre_run` / `post_run`" + `: Runs before/after ` + "`run_script`" + `.
+      - ` + "`pre_commit`" + `: Runs before the agent proposes a git commit.
       - ` + "`pre_view` / `post_view`" + `: Runs before/after ` + "`read_file`" + `.
       **Example**:
       hooks:
@@ -792,8 +794,17 @@ When using 'apply_udiff', provide a unified diff.
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
+							// Pre-run hook
+							runSkillHooks(ctx, skills, "pre_run", map[string]string{"path": args.Path, "args": strings.Join(args.Args, " ")})
+
 							fmt.Printf("Executing script: %s %v\n", args.Path, args.Args)
 							toolResult, toolErr = runSafeScript(ctx, args.Path, args.Args, skillsPrompt)
+
+							// Post-run hook
+							hookOut := runSkillHooks(ctx, skills, "post_run", map[string]string{"path": args.Path, "args": strings.Join(args.Args, " ")})
+							if hookOut != "" {
+								toolResult += "\n\n[Hook Output]\n" + hookOut
+							}
 						}
 
 					case "list_files":
@@ -938,6 +949,12 @@ When using 'apply_udiff', provide a unified diff.
 			if err != nil {
 				fmt.Printf("Failed to generate commit message: %v\n", err)
 			} else {
+				// Pre-commit hook
+				hookOut := runSkillHooks(context.Background(), skills, "pre_commit", map[string]string{"message": commitMsg})
+				if hookOut != "" {
+					fmt.Printf("\n[Pre-Commit Hook Output]\n%s\n", hookOut)
+				}
+
 				fmt.Printf("\n[Git] Proposed commit message: %s\n", commitMsg)
 				fmt.Print("Commit these changes? [y/N]: ")
 				confirm, _ := reader.ReadString('\n')
