@@ -238,6 +238,7 @@ type Skill struct {
 	Path           string
 	DefinitionFile string
 	Hooks          map[string]string
+	Scripts        []string
 }
 
 // var supportedHooks = []string{"startup", "pre_edit", "post_edit", "pre_view", "post_view", "pre_run", "post_run", "pre_commit"}
@@ -418,6 +419,18 @@ func parseSkill(path string) (Skill, error) {
 	absPath, _ := filepath.Abs(filepath.Dir(path))
 	defFile, _ := filepath.Abs(path)
 
+	var scripts []string
+	scriptsDir := filepath.Join(filepath.Dir(path), "scripts")
+	if _, err := os.Stat(scriptsDir); err == nil {
+		filepath.WalkDir(scriptsDir, func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return nil
+			}
+			scripts = append(scripts, p)
+			return nil
+		})
+	}
+
 	return Skill{
 		Name:           name,
 		Description:    description,
@@ -426,6 +439,7 @@ func parseSkill(path string) (Skill, error) {
 		Path:           absPath,
 		DefinitionFile: defFile,
 		Hooks:          hooks,
+		Scripts:        scripts,
 	}, nil
 }
 
@@ -446,6 +460,12 @@ func generateSkillsPrompt(skills []Skill) string {
 		sb.WriteString(fmt.Sprintf(": %s\n", s.Description))
 		if len(s.Dependencies) > 0 {
 			sb.WriteString(fmt.Sprintf("  Dependencies: %s\n", strings.Join(s.Dependencies, ", ")))
+		}
+		if len(s.Scripts) > 0 {
+			sb.WriteString("  Scripts:\n")
+			for _, script := range s.Scripts {
+				sb.WriteString(fmt.Sprintf("    - %s\n", script))
+			}
 		}
 		sb.WriteString(fmt.Sprintf("  Definition: %s\n", s.DefinitionFile))
 	}
