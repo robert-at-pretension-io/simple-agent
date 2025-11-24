@@ -555,7 +555,7 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 		fmt.Print("\033[?25h") // Show cursor
 	}
 
-	bufRead := make([]byte, 3)
+	bufRead := make([]byte, 12)
 
 	for {
 		n, err := os.Stdin.Read(bufRead)
