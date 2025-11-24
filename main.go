@@ -495,13 +495,12 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 
 // readInteractiveInput reads input in raw mode to support arrow keys and multi-line editing.
 // It handles basic line wrapping and cursor movement.
-func readInteractiveInput() (string, error) {
+func readInteractiveInput(reader *bufio.Reader) (string, error) {
 	// Attempt to set raw mode
 	cmd := exec.Command("stty", "-icanon", "-echo")
 	cmd.Stdin = os.Stdin
 	if err := cmd.Run(); err != nil {
-		// Fallback for non-POSIX or error
-		reader := bufio.NewReader(os.Stdin)
+		// Fallback for non-POSIX or error: use the provided reader
 		return reader.ReadString('\n')
 	}
 	defer exec.Command("stty", "icanon", "echo").Run()
@@ -729,7 +728,7 @@ When using 'apply_udiff', provide a unified diff.
 		} else {
 			fmt.Print("> ")
 			var err error
-			input, err = readInteractiveInput()
+			input, err = readInteractiveInput(reader)
 			if err != nil {
 				if err == io.EOF {
 					break
