@@ -1401,13 +1401,22 @@ func validatePath(path string) (string, error) {
 		return "", fmt.Errorf("failed to resolve absolute path: %w", err)
 	}
 
+	// Check if path is within CoreSkillsDir (Read-Only/Exec allowed)
+	isCore := false
+	if CoreSkillsDir != "" {
+		relCore, err := filepath.Rel(CoreSkillsDir, absPath)
+		if err == nil && !strings.HasPrefix(relCore, "..") {
+			isCore = true
+		}
+	}
+
 	// Check if path is within CWD using filepath.Rel
 	rel, err := filepath.Rel(cwd, absPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to check path relation: %w", err)
 	}
 
-	if strings.HasPrefix(rel, "..") {
+	if strings.HasPrefix(rel, "..") && !isCore {
 		return "", fmt.Errorf("access denied: path '%s' is outside the current working directory", path)
 	}
 
@@ -1449,7 +1458,7 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 	// Validate path
 	absPath, err := validatePath(scriptPath)
 	if err != nil {
-		return "", fmt.Errorf("%w\n\nREMINDER: run_script can only execute scripts defined within the 'skills' directory.\n%s", err, skillsPrompt)
+		return "", fmt.Errorf("%w\n\nREMINDER: run_script can only execute scripts defined within a 'skills' directory (Local or Core).\n%s", err, skillsPrompt)
 	}
 
 	// Check if file exists
@@ -1591,6 +1600,11 @@ func applyUDiff(ctx context.Context, path string, diff string, dryRun bool) (str
 	absPath, err := validatePath(path)
 	if err != nil {
 		return "", err
+	}
+
+	// Protect CoreSkillsDir from modification
+	if CoreSkillsDir != "" && strings.HasPrefix(absPath, CoreSkillsDir) {
+		return "", fmt.Errorf("access denied: cannot modify core skills in '%s'", CoreSkillsDir)
 	}
 
 	// Read original file
