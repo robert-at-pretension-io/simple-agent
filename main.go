@@ -142,13 +142,13 @@ var runScriptTool = Tool{
 	Type: "function",
 	Function: FunctionDefinition{
 		Name:        "run_script",
-		Description: "Execute a script from a skill's scripts directory.",
+		Description: "Execute a shell script (.sh) from a skill. IMPORTANT: The script MUST be located explicitly within a 'skills/<skill_name>/scripts/' directory.",
 		Parameters: json.RawMessage(`{
 	"type": "object",
 	"properties": {
 		"path": {
 			"type": "string",
-			"description": "The path to the script to execute (must be within a 'scripts' directory of a skill)"
+			"description": "The file path to the script. It MUST start with 'skills/' and contain '/scripts/' (e.g., 'skills/todo-manager/scripts/scan.sh')."
 		},
 		"args": {
 			"type": "array",
