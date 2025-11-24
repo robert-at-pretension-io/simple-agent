@@ -581,22 +581,87 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 				buf = append(buf[:cursor-1], buf[cursor:]...)
 				cursor--
 			}
+		} else if s == "\x17" || s == "\x1b\x7f" { // Ctrl+W or Alt+Backspace
+			// Delete word backwards
+			oldCursor := cursor
+			for cursor > 0 && unicode.IsSpace(buf[cursor-1]) { cursor-- }
+			for cursor > 0 && !unicode.IsSpace(buf[cursor-1]) { cursor-- }
+			buf = append(buf[:cursor], buf[oldCursor:]...)
+		} else if s == "\x01" || s == "\x1b[H" || s == "\x1b[1~" || s == "\x1bOH" { // Ctrl+A or Home
+			for cursor > 0 && buf[cursor-1] != '\n' { cursor-- }
+		} else if s == "\x05" || s == "\x1b[F" || s == "\x1b[4~" || s == "\x1bOF" { // Ctrl+E or End
+			for cursor < len(buf) && buf[cursor] != '\n' { cursor++ }
+		} else if s == "\x1b[1;5H" { // Ctrl+Home
+			cursor = 0
+		} else if s == "\x1b[1;5F" { // Ctrl+End
+			cursor = len(buf)
+		} else if s == "\x15" { // Ctrl+U
+			// Clear from cursor to start of line
+			start := cursor
+			for start > 0 && buf[start-1] != '\n' { start-- }
+			buf = append(buf[:start], buf[cursor:]...)
+			cursor = start
+		} else if s == "\x0b" { // Ctrl+K
+			// Clear from cursor to end of line
+			end := cursor
+			for end < len(buf) && buf[end] != '\n' { end++ }
+			buf = append(buf[:cursor], buf[end:]...)
+		} else if s == "\x1b[3~" { // Delete
+			if cursor < len(buf) {
+				buf = append(buf[:cursor], buf[cursor+1:]...)
+			}
+		} else if s == "\x0c" { // Ctrl+L
+			fmt.Print("\033[H\033[2J")
+			currentVisualRow = 0
 		} else if strings.HasPrefix(s, "\x1b") { // Escape sequence
 			if s == "\x1b[D" { // Left
 				if cursor > 0 { cursor-- }
 			} else if s == "\x1b[C" { // Right
 				if cursor < len(buf) { cursor++ }
 			} else if s == "\x1b[A" { // Up (Previous line)
-				// Find previous newline
-				// ... logic omitted for brevity, simple left fallback
-				if cursor > 0 { cursor-- }
+				// Find start of current line
+				lineStart := cursor
+				for lineStart > 0 && buf[lineStart-1] != '\n' { lineStart-- }
+				col := cursor - lineStart
+
+				// Find start of previous line
+				if lineStart > 0 {
+					prevLineEnd := lineStart - 1
+					prevLineStart := prevLineEnd
+					for prevLineStart > 0 && buf[prevLineStart-1] != '\n' { prevLineStart-- }
+					
+					newCursor := prevLineStart + col
+					if newCursor > prevLineEnd {
+						newCursor = prevLineEnd
+					}
+					cursor = newCursor
+				}
 			} else if s == "\x1b[B" { // Down
-				if cursor < len(buf) { cursor++ }
-			} else if s == "\x1b[1;5D" || s == "\x1b\x1b[D" { // Ctrl-Left (approx)
+				// Find start of current line
+				lineStart := cursor
+				for lineStart > 0 && buf[lineStart-1] != '\n' { lineStart-- }
+				col := cursor - lineStart
+
+				// Find end of current line
+				lineEnd := cursor
+				for lineEnd < len(buf) && buf[lineEnd] != '\n' { lineEnd++ }
+
+				if lineEnd < len(buf) { // Next line exists
+					nextLineStart := lineEnd + 1
+					nextLineEnd := nextLineStart
+					for nextLineEnd < len(buf) && buf[nextLineEnd] != '\n' { nextLineEnd++ }
+
+					newCursor := nextLineStart + col
+					if newCursor > nextLineEnd {
+						newCursor = nextLineEnd
+					}
+					cursor = newCursor
+				}
+			} else if s == "\x1b[1;5D" || s == "\x1b\x1b[D" || s == "\x1bb" { // Ctrl-Left or Alt-B
 				// Move left until space
 				for cursor > 0 && unicode.IsSpace(buf[cursor-1]) { cursor-- }
 				for cursor > 0 && !unicode.IsSpace(buf[cursor-1]) { cursor-- }
-			} else if s == "\x1b[1;5C" || s == "\x1b\x1b[C" { // Ctrl-Right
+			} else if s == "\x1b[1;5C" || s == "\x1b\x1b[C" || s == "\x1bf" { // Ctrl-Right or Alt-F
 				// Move right until space
 				for cursor < len(buf) && !unicode.IsSpace(buf[cursor]) { cursor++ }
 				for cursor < len(buf) && unicode.IsSpace(buf[cursor]) { cursor++ }
