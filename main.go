@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +21,11 @@ import (
 	"unicode"
 	"strconv"
 )
+
+//go:embed skills
+var embeddedSkillsFS embed.FS
+
+var CoreSkillsDir string
 
 const (
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
@@ -743,8 +749,32 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Setup Core Skills (Extract embedded)
+	if err := setupCoreSkills(); err != nil {
+		fmt.Printf("Warning: Failed to extract core skills: %v\n", err)
+	}
+
 	// Discover skills
-	skills := discoverSkills("./skills")
+	// 1. Core Skills
+	coreSkills := discoverSkills(CoreSkillsDir)
+	// 2. Project Skills (Current Directory)
+	projectSkills := discoverSkills("./skills")
+
+	// Merge skills (Project overrides Core)
+	skillMap := make(map[string]Skill)
+	for _, s := range coreSkills {
+		skillMap[s.Name] = s
+	}
+	for _, s := range projectSkills {
+		skillMap[s.Name] = s
+	}
+
+	// Convert back to slice
+	var skills []Skill
+	for _, s := range skillMap {
+		skills = append(skills, s)
+	}
+
 	skillsPrompt := generateSkillsPrompt(skills)
 
 	// Track known skills to detect additions
@@ -1174,9 +1204,16 @@ When using 'apply_udiff', provide a unified diff.
 				}
 
 				// Check for new skills
-				currentSkills := discoverSkills("./skills")
+				// Re-discover only project skills for dynamic updates
+				currentProjectSkills := discoverSkills("./skills")
+				
+				// Merge again
+				for _, s := range currentProjectSkills {
+					skillMap[s.Name] = s
+				}
+
 				var newSkills []Skill
-				for _, s := range currentSkills {
+				for _, s := range skillMap {
 					if !knownSkills[s.Name] {
 						newSkills = append(newSkills, s)
 						knownSkills[s.Name] = true
@@ -1184,7 +1221,11 @@ When using 'apply_udiff', provide a unified diff.
 				}
 
 				if len(newSkills) > 0 {
-					skills = currentSkills // Update main skills list
+					// Rebuild main skills list
+					skills = []Skill{}
+					for _, s := range skillMap {
+						skills = append(skills, s)
+					}
 					skillsPrompt = generateSkillsPrompt(skills)
 
 					var sb strings.Builder
@@ -1303,6 +1344,47 @@ func startSpinner(stopChan chan struct{}, doneChan chan struct{}) {
 	}
 }
 
+func setupCoreSkills() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	
+	// Create a hidden directory in user home for core skills
+	CoreSkillsDir = filepath.Join(home, ".simple_agent", "core_skills")
+	
+	// Remove old version to ensure updates apply
+	os.RemoveAll(CoreSkillsDir)
+
+	err = fs.WalkDir(embeddedSkillsFS, "skills", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Rel path from "skills" root in embed
+		relPath, _ := filepath.Rel("skills", path)
+		targetPath := filepath.Join(CoreSkillsDir, relPath)
+
+		if d.IsDir() {
+			return os.MkdirAll(targetPath, 0755)
+		}
+
+		data, err := embeddedSkillsFS.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		// Write file (executable for scripts)
+		return os.WriteFile(targetPath, data, 0755)
+	})
+	
+	if err != nil {
+		return err
+	}
+	
+	return nil
+}
+
 // --- Tool Implementations ---
 
 // validatePath ensures the path is within the current working directory
@@ -1381,10 +1463,14 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 
 	// Check if it is inside a "scripts" folder within "skills"
 	cwd, _ := os.Getwd()
-	skillsDir := filepath.Join(cwd, "skills")
+	localSkillsDir := filepath.Join(cwd, "skills")
 
-	if !strings.HasPrefix(absPath, skillsDir) {
-		return "", fmt.Errorf("script must be inside the 'skills' directory.\n%s", skillsPrompt)
+	// Validate it's in either Local or Core skills dir
+	isLocal := strings.HasPrefix(absPath, localSkillsDir)
+	isCore := CoreSkillsDir != "" && strings.HasPrefix(absPath, CoreSkillsDir)
+
+	if !isLocal && !isCore {
+		return "", fmt.Errorf("script must be inside a 'skills' directory (Local or Core).\n%s", skillsPrompt)
 	}
 
 	// Check for 'scripts' in the path components
