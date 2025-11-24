@@ -845,42 +845,91 @@ When using 'apply_udiff', provide a unified diff.
 				break
 			}
 
-			req, err := http.NewRequestWithContext(ctx, "POST", GeminiURL, bytes.NewBuffer(jsonData))
-			if err != nil {
-				fmt.Printf("Error creating request: %v\n", err)
-				break
-			}
+			var resp *http.Response
+			var body []byte
+			maxRetries := 3
+			retryDelay := 2 * time.Second
 
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Authorization", "Bearer "+apiKey)
+			for attempt := 0; attempt <= maxRetries; attempt++ {
+				if attempt > 0 {
+					fmt.Printf("Retrying in %v... (Attempt %d/%d)\n", retryDelay, attempt, maxRetries)
+					select {
+					case <-ctx.Done():
+						break
+					case <-time.After(retryDelay):
+						retryDelay *= 2
+					}
+				}
 
-			spinnerStop := make(chan struct{})
-			spinnerDone := make(chan struct{})
-			go startSpinner(spinnerStop, spinnerDone)
-
-			resp, err := client.Do(req)
-
-			close(spinnerStop)
-			<-spinnerDone
-
-			if err != nil {
-				if ctx.Err() == context.Canceled {
-					fmt.Println("\nRequest canceled.")
+				req, err := http.NewRequestWithContext(ctx, "POST", GeminiURL, bytes.NewBuffer(jsonData))
+				if err != nil {
+					fmt.Printf("Error creating request: %v\n", err)
 					break
 				}
-				fmt.Printf("Error sending request: %v\n", err)
-				break
-			}
-			defer resp.Body.Close()
 
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				fmt.Printf("Error reading response: %v\n", err)
-				break
-			}
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+apiKey)
 
-			if resp.StatusCode != http.StatusOK {
+				spinnerStop := make(chan struct{})
+				spinnerDone := make(chan struct{})
+				go startSpinner(spinnerStop, spinnerDone)
+
+				resp, err = client.Do(req)
+
+				close(spinnerStop)
+				<-spinnerDone
+
+				if err != nil {
+					if ctx.Err() == context.Canceled {
+						fmt.Println("\nRequest canceled.")
+						break
+					}
+					fmt.Printf("Error sending request: %v\n", err)
+					continue
+				}
+
+				body, err = io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if err != nil {
+					fmt.Printf("Error reading response: %v\n", err)
+					continue
+				}
+
+				if resp.StatusCode == http.StatusOK {
+					break
+				}
+
+				if resp.StatusCode == 400 {
+					fmt.Printf("API Error (Status 400): %s\nLogging to errors.txt\n", string(body))
+					f, err := os.OpenFile("errors.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+					if err == nil {
+						timestamp := time.Now().Format(time.RFC3339)
+						f.WriteString(fmt.Sprintf("Timestamp: %s\nError: %s\n", timestamp, string(body)))
+						f.WriteString("Last Messages:\n")
+						start := 0
+						if len(messages) > 2 {
+							start = len(messages) - 2
+						}
+						for i := start; i < len(messages); i++ {
+							content, _ := json.Marshal(messages[i])
+							f.WriteString(fmt.Sprintf("%s\n", content))
+						}
+						f.WriteString("--------------------------------------------------\n")
+						f.Close()
+					}
+					break
+				}
+
+				if resp.StatusCode == 429 || resp.StatusCode >= 500 {
+					fmt.Printf("API Error (Status %d): %s\n", resp.StatusCode, string(body))
+					continue
+				}
+
 				fmt.Printf("API Error (Status %d): %s\n", resp.StatusCode, string(body))
+				break
+			}
+
+			if resp == nil || resp.StatusCode != http.StatusOK {
 				break
 			}
 
