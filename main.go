@@ -847,7 +847,7 @@ When using 'apply_udiff', provide a unified diff.
 
 			var resp *http.Response
 			var body []byte
-			maxRetries := 3
+			maxRetries := 7
 			retryDelay := 2 * time.Second
 
 			for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -1211,6 +1211,15 @@ When using 'apply_udiff', provide a unified diff.
 			var turnHistory []Message
 			if startHistoryIndex < len(messages) {
 				turnHistory = messages[startHistoryIndex:]
+			}
+
+			// If history is empty (e.g. after context reset), use the full recent context
+			if len(turnHistory) == 0 && len(messages) > 0 {
+				if len(messages) > 1 && messages[0].Role == "system" {
+					turnHistory = messages[1:]
+				} else {
+					turnHistory = messages
+				}
 			}
 
 			commitMsg, err := generateCommitMessage(apiKey, turnHistory)
@@ -1837,6 +1846,10 @@ func generateCommitMessage(apiKey string, history []Message) (string, error) {
 				historyBuf.WriteString(fmt.Sprintf("Tool Call: %s (%s)\n", tc.Function.Name, tc.Function.Arguments))
 			}
 		}
+	}
+
+	if historyBuf.Len() == 0 {
+		return "", fmt.Errorf("no conversation history available to generate commit message")
 	}
 
 	systemPrompt := "You are an expert developer. Generate a tight git commit message (less than 15 words) describing the changes made in the provided conversation history. Output ONLY the commit message. Do not use markdown or quotes."
