@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"strconv"
 )
 
 const (
@@ -492,7 +493,8 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 	return output.String()
 }
 
-// readInteractiveInput reads input in raw mode to support arrow keys and multi-line editing
+// readInteractiveInput reads input in raw mode to support arrow keys and multi-line editing.
+// It handles basic line wrapping and cursor movement.
 func readInteractiveInput() (string, error) {
 	// Attempt to set raw mode
 	cmd := exec.Command("stty", "-icanon", "-echo")
@@ -506,76 +508,52 @@ func readInteractiveInput() (string, error) {
 
 	var buf []rune
 	cursor := 0
-	
-	// Helper to clear and redraw
+	currentVisualRow := 0 // Track cursor row relative to prompt start
+
 	redraw := func() {
-		// Move to start of line, clear everything below
-		// We assume the prompt "> " is 2 chars.
-		// We can't easily handle visual wrapping without window size.
-		// We use ANSI codes to move up based on newline count in buffer.
-		
-		// Count newlines before cursor to know how far up to go?
-		// No, we need to clear the WHOLE previous render.
-		// We assume we are at the "end" of the previous render state?
-		// Actually, standard terminals leave cursor at the end of print.
-		
-		// Simpler strategy:
-		// 1. Hide cursor
-		// 2. Move to start of line (\r)
-		// 3. Move up N lines (count of \n in buf) - this assumes no visual wrap
-		// 4. Clear EOS (\033[J)
-		// 5. Print "> " + string(buf)
-		// 6. Move cursor to correct position
-		
+		width := getTermWidth()
+
 		fmt.Print("\033[?25l") // Hide cursor
-		
-		// Calculate total lines
-		totalLines := strings.Count(string(buf), "\n")
-		
-		// We need to move cursor to the PROMPT start.
-		// BUT, we don't know where the cursor IS currently relative to prompt if we just moved it.
-		// So we must track our visual cursor state? 
-		// Let's just assume we clear screen and reprint? Too aggressive.
-		
-		// Alternative: Only verify with \r and \033[J if we assume we are at the end?
-		// Let's try: \r (start line), \033[A (up) * totalLines, \033[J (clear down)
-		
-		// NOTE: This will fail if the user's terminal wraps lines. 
-		// But strictly satisfying "left/right arrow" with "std lib only" implies limitations.
-		
-		fmt.Print("\r")
-		if totalLines > 0 {
-			fmt.Printf("\033[%dA", totalLines)
+
+		// 1. Move cursor to start of the prompt (based on previous state)
+		if currentVisualRow > 0 {
+			fmt.Printf("\033[%dA", currentVisualRow)
 		}
-		fmt.Print("\033[J") // Clear everything after
+		fmt.Print("\r")
+
+		// 2. Clear everything from cursor down
+		fmt.Print("\033[J")
+
+		// 3. Print prompt and buffer
 		fmt.Print("> " + string(buf))
-		
-		// Now position cursor
-		// Target row/col
-		preCursor := buf[:cursor]
-		curLines := strings.Count(string(preCursor), "\n")
-		lastNewLine := strings.LastIndex(string(preCursor), "\n")
-		col := 2 + len(preCursor) // +2 for "> "
-		if lastNewLine != -1 {
-			col = len(preCursor) - lastNewLine - 1
+
+		// 4. Calculate where the cursor IS now (end of print) vs where it SHOULD be
+		// End position (where cursor is left after print)
+		endRow, _ := getCursorVisualPos(buf, len(buf), width)
+
+		// Target position (where cursor should be)
+		targetRow, targetCol := getCursorVisualPos(buf, cursor, width)
+
+		// 5. Move cursor to target
+		// We are currently at endRow, endCol (implicit)
+		// To get to target, we move up (endRow - targetRow)
+		up := endRow - targetRow
+		if up > 0 {
+			fmt.Printf("\033[%dA", up)
 		}
-		
-		// Move from End of Buffer to Target
-		// Current cursor is at End of Buffer
-		linesFromEnd := totalLines - curLines
-		if linesFromEnd > 0 {
-			fmt.Printf("\033[%dA", linesFromEnd)
+		fmt.Print("\r") // Move to start of the target row
+		if targetCol > 0 {
+			fmt.Printf("\033[%dC", targetCol)
 		}
-		fmt.Print("\r")
-		if col > 0 {
-			fmt.Printf("\033[%dC", col)
-		}
-		
+
+		// Update state
+		currentVisualRow = targetRow
+
 		fmt.Print("\033[?25h") // Show cursor
 	}
 
 	bufRead := make([]byte, 3)
-	
+
 	for {
 		n, err := os.Stdin.Read(bufRead)
 		if err != nil {
@@ -632,6 +610,40 @@ func readInteractiveInput() (string, error) {
 		}
 		redraw()
 	}
+}
+
+func getTermWidth() int {
+	cmd := exec.Command("tput", "cols")
+	cmd.Stdin = os.Stdin
+	out, err := cmd.Output()
+	if err != nil {
+		return 80 // Default fallback
+	}
+	w, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		return 80
+	}
+	return w
+}
+
+func getCursorVisualPos(buf []rune, pos int, width int) (int, int) {
+	// Start after prompt "> " (2 chars)
+	x := 2
+	y := 0
+
+	for i := 0; i < pos && i < len(buf); i++ {
+		if buf[i] == '\n' {
+			y++
+			x = 0
+		} else {
+			x++
+			if x >= width {
+				x = 0
+				y++
+			}
+		}
+	}
+	return y, x
 }
 
 // --- Main ---
