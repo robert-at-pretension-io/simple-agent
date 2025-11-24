@@ -503,7 +503,11 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 		// Fallback for non-POSIX or error: use the provided reader
 		return reader.ReadString('\n')
 	}
-	defer exec.Command("stty", "icanon", "echo").Run()
+	defer func() {
+		cmd := exec.Command("stty", "icanon", "echo")
+		cmd.Stdin = os.Stdin
+		cmd.Run()
+	}()
 
 	var buf []rune
 	cursor := 0
