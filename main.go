@@ -860,6 +860,7 @@ func main() {
 	autoApprove := flag.Bool("auto-approve", false, "Automatically approve diffs without user confirmation")
 	continueSession := flag.Bool("continue", false, "Continue from previous session history")
 	gitAutoCommit := flag.Bool("git-auto-commit", false, "Automatically propose commits for file changes after every turn")
+	gitForceCommit := flag.Bool("git-force-commit", false, "Automatically commit changes without confirmation (implies -git-auto-commit)")
 	flag.Parse()
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -1417,7 +1418,7 @@ When using 'apply_udiff', provide a unified diff.
 		mu.Unlock()
 
 		// End of turn: Check for git changes and propose commit
-		if *gitAutoCommit && isGitDirty() {
+		if (*gitAutoCommit || *gitForceCommit) && isGitDirty() {
 			// Get conversation history for this turn
 			var turnHistory []Message
 			if startHistoryIndex < len(messages) {
@@ -1433,7 +1434,7 @@ When using 'apply_udiff', provide a unified diff.
 				}
 			}
 
-			if err := performGitCommit(apiKey, turnHistory, skills); err != nil {
+			if err := performGitCommit(apiKey, turnHistory, skills, *gitForceCommit); err != nil {
 				fmt.Printf("Git commit workflow failed: %v\n", err)
 			}
 		}
@@ -2232,7 +2233,7 @@ func gitCommit(message string) error {
 	return nil
 }
 
-func performGitCommit(apiKey string, history []Message, skills []Skill) error {
+func performGitCommit(apiKey string, history []Message, skills []Skill, force bool) error {
 	if !isGitDirty() {
 		return fmt.Errorf("git clean")
 	}
@@ -2249,9 +2250,13 @@ func performGitCommit(apiKey string, history []Message, skills []Skill) error {
 	}
 
 	fmt.Printf("\n[Git] Proposed commit message: %s\n", commitMsg)
-	fmt.Print("Commit these changes? [y/N]: ")
-	confirm, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-	confirm = strings.TrimSpace(confirm)
+
+	confirm := "y"
+	if !force {
+		fmt.Print("Commit these changes? [y/N]: ")
+		userIn, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		confirm = strings.TrimSpace(userIn)
+	}
 
 	if strings.ToLower(confirm) == "y" {
 		if err := gitCommit(commitMsg); err != nil {
@@ -2278,7 +2283,7 @@ func handleSlashCommand(input string, messages *[]Message, skills []Skill, syste
 				history = append(history, m)
 			}
 		}
-		if err := performGitCommit(apiKey, history, skills); err != nil {
+		if err := performGitCommit(apiKey, history, skills, false); err != nil {
 			if err.Error() == "git clean" {
 				fmt.Println("Nothing to commit (working directory clean).")
 			} else {
