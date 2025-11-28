@@ -492,7 +492,11 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 			}
 
 			// Parse command string into script path and args
-			parts := strings.Fields(cmdStr)
+			parts, err := parseArgs(cmdStr)
+			if err != nil {
+				fmt.Printf("[Hook Error] Failed to parse command '%s' for skill '%s': %v\n", cmdStr, skill.Name, err)
+				continue
+			}
 			if len(parts) == 0 {
 				continue
 			}
@@ -1454,6 +1458,58 @@ func readFile(ctx context.Context, path string, startLine, endLine int) (string,
 	return strings.Join(lines[startLine-1:endLine], "\n"), nil
 }
 
+func parseArgs(command string) ([]string, error) {
+	var args []string
+	var current strings.Builder
+	var inQuote rune
+	escaped := false
+
+	for _, r := range command {
+		if escaped {
+			current.WriteRune(r)
+			escaped = false
+			continue
+		}
+
+		if r == '\\' {
+			escaped = true
+			continue
+		}
+
+		if inQuote != 0 {
+			if r == inQuote {
+				inQuote = 0
+			} else {
+				current.WriteRune(r)
+			}
+			continue
+		}
+
+		if r == '"' || r == '\'' {
+			inQuote = r
+			continue
+		}
+
+		if unicode.IsSpace(r) {
+			if current.Len() > 0 {
+				args = append(args, current.String())
+				current.Reset()
+			}
+			continue
+		}
+
+		current.WriteRune(r)
+	}
+
+	if inQuote != 0 {
+		return nil, fmt.Errorf("unclosed quote")
+	}
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+	return args, nil
+}
+
 func runSafeScript(ctx context.Context, scriptPath string, args []string, skillsPrompt string) (string, error) {
 	// Validate path
 	absPath, err := validatePath(scriptPath)
@@ -1650,8 +1706,14 @@ func applyUDiff(ctx context.Context, path string, diff string, dryRun bool) (str
 			return "", fmt.Errorf("hunk %d failed to apply: pure insertion (no context lines) is not allowed in existing file.\nPlease provide at least 2 lines of context (' ') around the new code to uniquely locate the insertion point.", i+1)
 		}
 
+		// Verify uniqueness of the search block
+		matches := strings.Count(newContent, searchBlock)
+		if matches > 1 {
+			return "", fmt.Errorf("hunk %d failed to apply: ambiguous context. The search block matches %d times in the file.\nPlease provide more context lines to uniquely identify the code to replace.", i+1, matches)
+		}
+
 		// Check if search block exists
-		if !strings.Contains(newContent, searchBlock) {
+		if matches == 0 {
 			// Fuzzy search for error reporting
 			fileLines := strings.Split(newContent, "\n")
 			bestIdx, score := findBestMatch(fileLines, hunk.SearchLines)
@@ -2033,14 +2095,10 @@ func generateCommitMessage(apiKey string, history []Message) (string, error) {
 }
 
 func gitCommit(message string) error {
-	// Stage all changes
-	addCmd := exec.Command("git", "add", ".")
-	if out, err := addCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git add failed: %v\n%s", err, out)
-	}
-
-	// Commit
-	commitCmd := exec.Command("git", "commit", "-m", message)
+	// Commit tracked files only (modified/deleted)
+	// We avoid 'git add .' to prevent accidentally committing untracked files (e.g. debug logs, temp files).
+	// Users should explicitly add new files if they intend to commit them.
+	commitCmd := exec.Command("git", "commit", "-am", message)
 	if out, err := commitCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git commit failed: %v\n%s", err, out)
 	}
