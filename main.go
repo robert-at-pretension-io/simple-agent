@@ -101,7 +101,7 @@ var udiffTool = Tool{
 	Type: "function",
 	Function: FunctionDefinition{
 		Name:        "apply_udiff",
-		Description: "Apply a unified diff to a file. The diff should be in standard unified format (diff -U0), including headers.",
+		Description: "Apply a unified diff to a file. The diff should be in standard unified format (diff -U0), including headers. IMPORTANT: Context lines are mandatory for insertions.",
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -111,7 +111,7 @@ var udiffTool = Tool{
 				},
 				"diff": {
 					"type": "string",
-					"description": "The unified diff content. Must include @@ ... @@ headers for hunks."
+					"description": "The unified diff content. Must include @@ ... @@ headers for hunks. Must include context lines."
 				}
 			},
 			"required": ["path", "diff"]
@@ -933,6 +933,7 @@ When using 'apply_udiff', provide a unified diff.
 - Start hunks with '@@ ... @@'
 - Use ' ' for context, '-' for removal, '+' for addition.
 - **ALWAYS** include at least 2 lines of context around your changes.
+- **Context is MANDATORY**: When inserting code, you must include existing lines around the insertion point. A hunk with only '+' lines is invalid (unless creating a new file).
 - Do not include line numbers in the hunk header.
 - Ensure enough context is provided to uniquely locate the code.
 - Replace entire blocks/functions rather than small internal edits to ensure uniqueness.
