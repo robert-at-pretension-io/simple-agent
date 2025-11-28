@@ -632,6 +632,7 @@ func readInteractiveInput(reader *bufio.Reader, history []string) (string, error
 			if len(buf) == 0 {
 				return "", io.EOF
 			}
+			fmt.Println()
 			return string(buf), nil
 		} else if s == "\r" || s == "\n" {
 			buf = append(buf[:cursor], append([]rune{'\n'}, buf[cursor:]...)...)
