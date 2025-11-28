@@ -2295,11 +2295,7 @@ func handleSlashCommand(input string, messages *[]Message, skills []Skill, syste
 }
 
 func getHistoryPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ".chat_history.json"
-	}
-	return filepath.Join(home, ".simple_agent_history.json")
+	return ".simple_agent_history.json"
 }
 
 func loadHistory() []Message {
