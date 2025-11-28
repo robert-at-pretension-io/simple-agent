@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"context"
 	"embed"
-	"flag"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -16,11 +16,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unicode"
-	"strconv"
 )
 
 //go:embed skills
@@ -597,10 +597,10 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		
+
 		// Parse input
 		s := string(bufRead[:n])
-		
+
 		if s == "\x03" { // Ctrl+C
 			return "", fmt.Errorf("interrupted")
 		} else if s == "\x04" { // Ctrl+D
@@ -619,13 +619,21 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 		} else if s == "\x17" || s == "\x1b\x7f" { // Ctrl+W or Alt+Backspace
 			// Delete word backwards
 			oldCursor := cursor
-			for cursor > 0 && unicode.IsSpace(buf[cursor-1]) { cursor-- }
-			for cursor > 0 && !unicode.IsSpace(buf[cursor-1]) { cursor-- }
+			for cursor > 0 && unicode.IsSpace(buf[cursor-1]) {
+				cursor--
+			}
+			for cursor > 0 && !unicode.IsSpace(buf[cursor-1]) {
+				cursor--
+			}
 			buf = append(buf[:cursor], buf[oldCursor:]...)
 		} else if s == "\x01" || s == "\x1b[H" || s == "\x1b[1~" || s == "\x1bOH" { // Ctrl+A or Home
-			for cursor > 0 && buf[cursor-1] != '\n' { cursor-- }
+			for cursor > 0 && buf[cursor-1] != '\n' {
+				cursor--
+			}
 		} else if s == "\x05" || s == "\x1b[F" || s == "\x1b[4~" || s == "\x1bOF" { // Ctrl+E or End
-			for cursor < len(buf) && buf[cursor] != '\n' { cursor++ }
+			for cursor < len(buf) && buf[cursor] != '\n' {
+				cursor++
+			}
 		} else if s == "\x1b[1;5H" { // Ctrl+Home
 			cursor = 0
 		} else if s == "\x1b[1;5F" { // Ctrl+End
@@ -633,13 +641,17 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 		} else if s == "\x15" { // Ctrl+U
 			// Clear from cursor to start of line
 			start := cursor
-			for start > 0 && buf[start-1] != '\n' { start-- }
+			for start > 0 && buf[start-1] != '\n' {
+				start--
+			}
 			buf = append(buf[:start], buf[cursor:]...)
 			cursor = start
 		} else if s == "\x0b" { // Ctrl+K
 			// Clear from cursor to end of line
 			end := cursor
-			for end < len(buf) && buf[end] != '\n' { end++ }
+			for end < len(buf) && buf[end] != '\n' {
+				end++
+			}
 			buf = append(buf[:cursor], buf[end:]...)
 		} else if s == "\x1b[3~" { // Delete
 			if cursor < len(buf) {
@@ -650,21 +662,29 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 			currentVisualRow = 0
 		} else if strings.HasPrefix(s, "\x1b") { // Escape sequence
 			if s == "\x1b[D" { // Left
-				if cursor > 0 { cursor-- }
+				if cursor > 0 {
+					cursor--
+				}
 			} else if s == "\x1b[C" { // Right
-				if cursor < len(buf) { cursor++ }
+				if cursor < len(buf) {
+					cursor++
+				}
 			} else if s == "\x1b[A" { // Up (Previous line)
 				// Find start of current line
 				lineStart := cursor
-				for lineStart > 0 && buf[lineStart-1] != '\n' { lineStart-- }
+				for lineStart > 0 && buf[lineStart-1] != '\n' {
+					lineStart--
+				}
 				col := cursor - lineStart
 
 				// Find start of previous line
 				if lineStart > 0 {
 					prevLineEnd := lineStart - 1
 					prevLineStart := prevLineEnd
-					for prevLineStart > 0 && buf[prevLineStart-1] != '\n' { prevLineStart-- }
-					
+					for prevLineStart > 0 && buf[prevLineStart-1] != '\n' {
+						prevLineStart--
+					}
+
 					newCursor := prevLineStart + col
 					if newCursor > prevLineEnd {
 						newCursor = prevLineEnd
@@ -674,17 +694,23 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 			} else if s == "\x1b[B" { // Down
 				// Find start of current line
 				lineStart := cursor
-				for lineStart > 0 && buf[lineStart-1] != '\n' { lineStart-- }
+				for lineStart > 0 && buf[lineStart-1] != '\n' {
+					lineStart--
+				}
 				col := cursor - lineStart
 
 				// Find end of current line
 				lineEnd := cursor
-				for lineEnd < len(buf) && buf[lineEnd] != '\n' { lineEnd++ }
+				for lineEnd < len(buf) && buf[lineEnd] != '\n' {
+					lineEnd++
+				}
 
 				if lineEnd < len(buf) { // Next line exists
 					nextLineStart := lineEnd + 1
 					nextLineEnd := nextLineStart
-					for nextLineEnd < len(buf) && buf[nextLineEnd] != '\n' { nextLineEnd++ }
+					for nextLineEnd < len(buf) && buf[nextLineEnd] != '\n' {
+						nextLineEnd++
+					}
 
 					newCursor := nextLineStart + col
 					if newCursor > nextLineEnd {
@@ -694,12 +720,20 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 				}
 			} else if s == "\x1b[1;5D" || s == "\x1b\x1b[D" || s == "\x1bb" { // Ctrl-Left or Alt-B
 				// Move left until space
-				for cursor > 0 && unicode.IsSpace(buf[cursor-1]) { cursor-- }
-				for cursor > 0 && !unicode.IsSpace(buf[cursor-1]) { cursor-- }
+				for cursor > 0 && unicode.IsSpace(buf[cursor-1]) {
+					cursor--
+				}
+				for cursor > 0 && !unicode.IsSpace(buf[cursor-1]) {
+					cursor--
+				}
 			} else if s == "\x1b[1;5C" || s == "\x1b\x1b[C" || s == "\x1bf" { // Ctrl-Right or Alt-F
 				// Move right until space
-				for cursor < len(buf) && !unicode.IsSpace(buf[cursor]) { cursor++ }
-				for cursor < len(buf) && unicode.IsSpace(buf[cursor]) { cursor++ }
+				for cursor < len(buf) && !unicode.IsSpace(buf[cursor]) {
+					cursor++
+				}
+				for cursor < len(buf) && unicode.IsSpace(buf[cursor]) {
+					cursor++
+				}
 			}
 		} else {
 			// Print chars
@@ -829,6 +863,11 @@ When using 'apply_udiff', provide a unified diff.
 - Ensure enough context is provided to uniquely locate the code.
 - Replace entire blocks/functions rather than small internal edits to ensure uniqueness.
 - If a file does not exist, treat it as empty for the 'before' state.
+- **CLI PREFERENCE**: You are encouraged to use the CLI for efficiency and exploration.
+- Use 'ls -R', 'grep', or 'find' to explore the file structure and search for patterns.
+- Use 'cat', 'head', or 'tail' to quickly inspect file contents.
+- Run standard tools (git, go, npm, etc.) directly when needed.
+- Prefer shell commands for operations that are concise and standard.
 `
 	systemPrompt := baseSystemPrompt + getSkillsExplanation() + skillsPrompt
 
@@ -1240,7 +1279,7 @@ When using 'apply_udiff', provide a unified diff.
 				// Check for new skills
 				// Re-discover only project skills for dynamic updates
 				currentProjectSkills := discoverSkills("./skills")
-				
+
 				// Merge again
 				for _, s := range currentProjectSkills {
 					skillMap[s.Name] = s
@@ -1384,10 +1423,10 @@ func setupCoreSkills() error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Create a hidden directory in user home for core skills
 	CoreSkillsDir = filepath.Join(home, ".simple_agent", "core_skills")
-	
+
 	// Remove old version to ensure updates apply
 	os.RemoveAll(CoreSkillsDir)
 
@@ -1412,11 +1451,11 @@ func setupCoreSkills() error {
 		// Write file (executable for scripts)
 		return os.WriteFile(targetPath, data, 0755)
 	})
-	
+
 	if err != nil {
 		return err
 	}
-	
+
 	return nil
 }
 
