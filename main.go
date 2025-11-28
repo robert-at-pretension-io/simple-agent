@@ -530,7 +530,7 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 
 // readInteractiveInput reads input in raw mode to support arrow keys and multi-line editing.
 // It handles basic line wrapping and cursor movement.
-func readInteractiveInput(reader *bufio.Reader) (string, error) {
+func readInteractiveInput(reader *bufio.Reader, history []string) (string, error) {
 	// Attempt to set raw mode
 	cmd := exec.Command("stty", "-icanon", "-echo")
 	cmd.Stdin = os.Stdin
@@ -547,6 +547,26 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 	var buf []rune
 	cursor := 0
 	currentVisualRow := 0 // Track cursor row relative to prompt start
+	historyIndex := len(history)
+	var currentInputDraft []rune
+
+	isFirstLine := func() bool {
+		for i := cursor - 1; i >= 0; i-- {
+			if buf[i] == '\n' {
+				return false
+			}
+		}
+		return true
+	}
+
+	isLastLine := func() bool {
+		for i := cursor; i < len(buf); i++ {
+			if buf[i] == '\n' {
+				return false
+			}
+		}
+		return true
+	}
 
 	redraw := func() {
 		width := getTermWidth()
@@ -563,14 +583,19 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 		fmt.Print("\033[J")
 
 		// 3. Print prompt and buffer
-		fmt.Print("> " + string(buf))
+		prompt := "\033[1;32mUser 👤\033[0m > "
+		fmt.Print(prompt + string(buf))
 
 		// 4. Calculate where the cursor IS now (end of print) vs where it SHOULD be
 		// End position (where cursor is left after print)
-		endRow, _ := getCursorVisualPos(buf, len(buf), width)
+		// Note: Prompt length is visually different from string length due to ANSI codes.
+		// The prompt "> " is 2 chars. "User 👤 > " is 9 visual chars (User + space + emoji + space + > + space).
+		// Let's approximate visual length as 9.
+		visualPromptLen := 9
+		endRow, _ := getCursorVisualPos(buf, len(buf), width, visualPromptLen)
 
 		// Target position (where cursor should be)
-		targetRow, targetCol := getCursorVisualPos(buf, cursor, width)
+		targetRow, targetCol := getCursorVisualPos(buf, cursor, width, visualPromptLen)
 
 		// 5. Move cursor to target
 		// We are currently at endRow, endCol (implicit)
@@ -611,10 +636,16 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 		} else if s == "\r" || s == "\n" {
 			buf = append(buf[:cursor], append([]rune{'\n'}, buf[cursor:]...)...)
 			cursor++
+			if historyIndex == len(history) {
+				currentInputDraft = buf
+			}
 		} else if s == "\x7f" { // Backspace
 			if cursor > 0 {
 				buf = append(buf[:cursor-1], buf[cursor:]...)
 				cursor--
+			}
+			if historyIndex == len(history) {
+				currentInputDraft = buf
 			}
 		} else if s == "\x17" || s == "\x1b\x7f" { // Ctrl+W or Alt+Backspace
 			// Delete word backwards
@@ -626,6 +657,9 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 				cursor--
 			}
 			buf = append(buf[:cursor], buf[oldCursor:]...)
+			if historyIndex == len(history) {
+				currentInputDraft = buf
+			}
 		} else if s == "\x01" || s == "\x1b[H" || s == "\x1b[1~" || s == "\x1bOH" { // Ctrl+A or Home
 			for cursor > 0 && buf[cursor-1] != '\n' {
 				cursor--
@@ -646,6 +680,9 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 			}
 			buf = append(buf[:start], buf[cursor:]...)
 			cursor = start
+			if historyIndex == len(history) {
+				currentInputDraft = buf
+			}
 		} else if s == "\x0b" { // Ctrl+K
 			// Clear from cursor to end of line
 			end := cursor
@@ -653,9 +690,15 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 				end++
 			}
 			buf = append(buf[:cursor], buf[end:]...)
+			if historyIndex == len(history) {
+				currentInputDraft = buf
+			}
 		} else if s == "\x1b[3~" { // Delete
 			if cursor < len(buf) {
 				buf = append(buf[:cursor], buf[cursor+1:]...)
+				if historyIndex == len(history) {
+					currentInputDraft = buf
+				}
 			}
 		} else if s == "\x0c" { // Ctrl+L
 			fmt.Print("\033[H\033[2J")
@@ -670,53 +713,78 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 					cursor++
 				}
 			} else if s == "\x1b[A" { // Up (Previous line)
-				// Find start of current line
-				lineStart := cursor
-				for lineStart > 0 && buf[lineStart-1] != '\n' {
-					lineStart--
-				}
-				col := cursor - lineStart
-
-				// Find start of previous line
-				if lineStart > 0 {
-					prevLineEnd := lineStart - 1
-					prevLineStart := prevLineEnd
-					for prevLineStart > 0 && buf[prevLineStart-1] != '\n' {
-						prevLineStart--
+				if isFirstLine() {
+					if historyIndex > 0 {
+						if historyIndex == len(history) {
+							currentInputDraft = make([]rune, len(buf))
+							copy(currentInputDraft, buf)
+						}
+						historyIndex--
+						buf = []rune(history[historyIndex])
+						cursor = len(buf)
 					}
-
-					newCursor := prevLineStart + col
-					if newCursor > prevLineEnd {
-						newCursor = prevLineEnd
+				} else {
+					// Find start of current line
+					lineStart := cursor
+					for lineStart > 0 && buf[lineStart-1] != '\n' {
+						lineStart--
 					}
-					cursor = newCursor
+					col := cursor - lineStart
+
+					// Find start of previous line
+					if lineStart > 0 {
+						prevLineEnd := lineStart - 1
+						prevLineStart := prevLineEnd
+						for prevLineStart > 0 && buf[prevLineStart-1] != '\n' {
+							prevLineStart--
+						}
+
+						newCursor := prevLineStart + col
+						if newCursor > prevLineEnd {
+							newCursor = prevLineEnd
+						}
+						cursor = newCursor
+					}
 				}
 			} else if s == "\x1b[B" { // Down
-				// Find start of current line
-				lineStart := cursor
-				for lineStart > 0 && buf[lineStart-1] != '\n' {
-					lineStart--
-				}
-				col := cursor - lineStart
+				if isLastLine() {
+					if historyIndex < len(history) {
+						historyIndex++
+						if historyIndex == len(history) {
+							buf = make([]rune, len(currentInputDraft))
+							copy(buf, currentInputDraft)
+						} else {
+							buf = []rune(history[historyIndex])
+						}
+						cursor = len(buf)
+					}
+				} else {
+					// Find start of current line
+					lineStart := cursor
+					for lineStart > 0 && buf[lineStart-1] != '\n' {
+						lineStart--
+					}
+					col := cursor - lineStart
 
-				// Find end of current line
-				lineEnd := cursor
-				for lineEnd < len(buf) && buf[lineEnd] != '\n' {
-					lineEnd++
-				}
-
-				if lineEnd < len(buf) { // Next line exists
-					nextLineStart := lineEnd + 1
-					nextLineEnd := nextLineStart
-					for nextLineEnd < len(buf) && buf[nextLineEnd] != '\n' {
-						nextLineEnd++
+					// Find end of current line
+					lineEnd := cursor
+					for lineEnd < len(buf) && buf[lineEnd] != '\n' {
+						lineEnd++
 					}
 
-					newCursor := nextLineStart + col
-					if newCursor > nextLineEnd {
-						newCursor = nextLineEnd
+					if lineEnd < len(buf) { // Next line exists
+						nextLineStart := lineEnd + 1
+						nextLineEnd := nextLineStart
+						for nextLineEnd < len(buf) && buf[nextLineEnd] != '\n' {
+							nextLineEnd++
+						}
+
+						newCursor := nextLineStart + col
+						if newCursor > nextLineEnd {
+							newCursor = nextLineEnd
+						}
+						cursor = newCursor
 					}
-					cursor = newCursor
 				}
 			} else if s == "\x1b[1;5D" || s == "\x1b\x1b[D" || s == "\x1bb" { // Ctrl-Left or Alt-B
 				// Move left until space
@@ -742,6 +810,9 @@ func readInteractiveInput(reader *bufio.Reader) (string, error) {
 				if unicode.IsPrint(r) {
 					buf = append(buf[:cursor], append([]rune{r}, buf[cursor:]...)...)
 					cursor++
+					if historyIndex == len(history) {
+						currentInputDraft = buf
+					}
 				}
 			}
 		}
@@ -763,9 +834,8 @@ func getTermWidth() int {
 	return w
 }
 
-func getCursorVisualPos(buf []rune, pos int, width int) (int, int) {
-	// Start after prompt "> " (2 chars)
-	x := 2
+func getCursorVisualPos(buf []rune, pos int, width int, promptLen int) (int, int) {
+	x := promptLen
 	y := 0
 
 	for i := 0; i < pos && i < len(buf); i++ {
@@ -902,6 +972,7 @@ When using 'apply_udiff', provide a unified diff.
 	client := &http.Client{}
 
 	var pendingInput string
+	var commandHistory []string
 
 	for {
 		var input string
@@ -910,9 +981,9 @@ When using 'apply_udiff', provide a unified diff.
 			input = pendingInput
 			pendingInput = ""
 		} else {
-			fmt.Print("> ")
+			fmt.Print("\033[1;32mUser 👤\033[0m > ")
 			var err error
-			input, err = readInteractiveInput(reader)
+			input, err = readInteractiveInput(reader, commandHistory)
 			if err != nil {
 				if err == io.EOF {
 					break
@@ -923,6 +994,7 @@ When using 'apply_udiff', provide a unified diff.
 			if strings.TrimSpace(input) == "" {
 				continue
 			}
+			commandHistory = append(commandHistory, input)
 
 			if handleSlashCommand(input, &messages, skills, systemPrompt) {
 				continue
@@ -1096,7 +1168,7 @@ When using 'apply_udiff', provide a unified diff.
 
 					switch toolCall.Function.Name {
 					case "apply_udiff":
-						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: apply_udiff\033[0m\n")
+						fmt.Printf("\n\033[1;35m🛠  Tool Call: apply_udiff\033[0m\n")
 						var args struct {
 							Path string `json:"path"`
 							Diff string `json:"diff"`
@@ -1152,7 +1224,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "read_file":
-						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: read_file\033[0m\n")
+						fmt.Printf("\n\033[1;35m🛠  Tool Call: read_file\033[0m\n")
 						var args struct {
 							Path      string `json:"path"`
 							StartLine int    `json:"start_line"`
@@ -1175,7 +1247,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "run_script":
-						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: run_script\033[0m\n")
+						fmt.Printf("\n\033[1;35m🛠  Tool Call: run_script\033[0m\n")
 						var args struct {
 							Path string   `json:"path"`
 							Args []string `json:"args"`
@@ -1197,7 +1269,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "list_files":
-						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: list_files\033[0m\n")
+						fmt.Printf("\n\033[1;35m🛠  Tool Call: list_files\033[0m\n")
 						var args struct {
 							Path string `json:"path"`
 						}
@@ -1209,7 +1281,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "search_files":
-						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: search_files\033[0m\n")
+						fmt.Printf("\n\033[1;35m🛠  Tool Call: search_files\033[0m\n")
 						var args struct {
 							Path  string `json:"path"`
 							Regex string `json:"regex"`
@@ -1222,7 +1294,7 @@ When using 'apply_udiff', provide a unified diff.
 						}
 
 					case "shorten_context":
-						fmt.Printf("\n\033[1;35m> 🛠  Tool Call: shorten_context\033[0m\n")
+						fmt.Printf("\n\033[1;35m🛠  Tool Call: shorten_context\033[0m\n")
 						var args struct {
 							Task   string `json:"task_description"`
 							Future string `json:"future_plans"`
