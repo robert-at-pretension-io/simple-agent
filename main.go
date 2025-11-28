@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"flag"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -474,6 +475,10 @@ func generateSkillsPrompt(skills []Skill) string {
 			}
 		}
 		sb.WriteString(fmt.Sprintf("  Definition: %s\n", s.DefinitionFile))
+
+		if s.Name == "yolo-runner" {
+			sb.WriteString("\n  **AUTONOMY MODE**: You have the 'yolo-runner' skill. Use it to run ANY shell command needed to complete your task. You are authorized to take initiative.\n")
+		}
 	}
 	return sb.String()
 }
@@ -747,6 +752,9 @@ func getCursorVisualPos(buf []rune, pos int, width int) (int, int) {
 // --- Main ---
 
 func main() {
+	autoApprove := flag.Bool("auto-approve", false, "Automatically approve diffs without user confirmation")
+	flag.Parse()
+
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		fmt.Println("Please set GEMINI_API_KEY environment variable.")
@@ -1048,9 +1056,16 @@ When using 'apply_udiff', provide a unified diff.
 								fmt.Printf("Proposed changes to %s:\n", args.Path)
 								printColoredDiff(args.Diff)
 
-								// Ask for confirmation
-								fmt.Print("Apply these changes? [y/N]: ")
-								confirm, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+								var confirm string
+								if *autoApprove {
+									fmt.Println("Auto-approving changes...")
+									confirm = "y"
+								} else {
+									// Ask for confirmation
+									fmt.Print("Apply these changes? [y/N]: ")
+									confirm, _ = bufio.NewReader(os.Stdin).ReadString('\n')
+								}
+
 								if ctx.Err() != nil {
 									toolErr = fmt.Errorf("interrupted by user")
 								} else {
