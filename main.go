@@ -589,9 +589,9 @@ func readInteractiveInput(reader *bufio.Reader, history []string) (string, error
 		// 4. Calculate where the cursor IS now (end of print) vs where it SHOULD be
 		// End position (where cursor is left after print)
 		// Note: Prompt length is visually different from string length due to ANSI codes.
-		// The prompt "> " is 2 chars. "User 👤 > " is 9 visual chars (User + space + emoji + space + > + space).
-		// Let's approximate visual length as 9.
-		visualPromptLen := 9
+		// The prompt "> " is 2 chars. "User 👤 > " is 10 visual chars (User + space + emoji + space + > + space).
+		// Let's approximate visual length as 10 (Emoji is usually wide).
+		visualPromptLen := 10
 		endRow, _ := getCursorVisualPos(buf, len(buf), width, visualPromptLen)
 
 		// Target position (where cursor should be)
