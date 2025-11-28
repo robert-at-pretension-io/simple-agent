@@ -787,6 +787,7 @@ func getCursorVisualPos(buf []rune, pos int, width int) (int, int) {
 
 func main() {
 	autoApprove := flag.Bool("auto-approve", false, "Automatically approve diffs without user confirmation")
+	continueSession := flag.Bool("continue", false, "Continue from previous session history")
 	flag.Parse()
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -879,14 +880,16 @@ When using 'apply_udiff', provide a unified diff.
 	}
 
 	// Load history
-	savedMessages := loadHistory()
-	if len(savedMessages) > 0 {
-		for _, m := range savedMessages {
-			if m.Role != "system" {
-				messages = append(messages, m)
+	if *continueSession {
+		savedMessages := loadHistory()
+		if len(savedMessages) > 0 {
+			for _, m := range savedMessages {
+				if m.Role != "system" {
+					messages = append(messages, m)
+				}
 			}
+			fmt.Printf("Loaded %d messages from history.\n", len(messages)-1)
 		}
-		fmt.Printf("Loaded %d messages from history.\n", len(messages)-1)
 	}
 
 	reader := bufio.NewReader(os.Stdin)
