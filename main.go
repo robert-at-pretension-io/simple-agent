@@ -839,6 +839,17 @@ When using 'apply_udiff', provide a unified diff.
 		},
 	}
 
+	// Load history
+	savedMessages := loadHistory()
+	if len(savedMessages) > 0 {
+		for _, m := range savedMessages {
+			if m.Role != "system" {
+				messages = append(messages, m)
+			}
+		}
+		fmt.Printf("Loaded %d messages from history.\n", len(messages)-1)
+	}
+
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("Welcome to Gemini REPL (%s)\n", ModelName)
 	if len(skills) > 0 {
@@ -868,6 +879,10 @@ When using 'apply_udiff', provide a unified diff.
 				os.Exit(1)
 			}
 			if strings.TrimSpace(input) == "" {
+				continue
+			}
+
+			if handleSlashCommand(input, &messages, skills, systemPrompt) {
 				continue
 			}
 		}
@@ -1336,6 +1351,7 @@ When using 'apply_udiff', provide a unified diff.
 				pendingInput = "The context size has exceeded 400,000 tokens. Please use the 'shorten_context' tool to summarize the conversation and reset the context."
 			}
 		}
+		saveHistory(messages)
 	}
 }
 
@@ -2118,4 +2134,81 @@ func gitCommit(message string) error {
 		return fmt.Errorf("git commit failed: %v\n%s", err, out)
 	}
 	return nil
+}
+
+func handleSlashCommand(input string, messages *[]Message, skills []Skill, systemPrompt string) bool {
+	cmd := strings.TrimSpace(input)
+	if !strings.HasPrefix(cmd, "/") {
+		return false
+	}
+
+	switch cmd {
+	case "/clear":
+		*messages = []Message{
+			{
+				Role:    "system",
+				Content: systemPrompt,
+			},
+		}
+		saveHistory(*messages)
+		fmt.Println("Conversation history cleared.")
+		return true
+	case "/skills":
+		fmt.Println("Available Skills:")
+		for _, s := range skills {
+			fmt.Printf("- %s (v%s): %s\n", s.Name, s.Version, s.Description)
+		}
+		return true
+	case "/history":
+		fmt.Printf("History contains %d messages.\n", len(*messages))
+		return true
+	case "/help":
+		fmt.Println("Available Commands:")
+		fmt.Println("  /clear   - Clear conversation history")
+		fmt.Println("  /skills  - List available skills")
+		fmt.Println("  /history - Show history stats")
+		fmt.Println("  /help    - Show this help message")
+		fmt.Println("  /exit    - Exit the agent")
+		return true
+	case "/exit", "/quit":
+		fmt.Println("Exiting...")
+		os.Exit(0)
+		return true
+	}
+
+	fmt.Printf("Unknown command: %s\n", cmd)
+	return true
+}
+
+func getHistoryPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ".chat_history.json"
+	}
+	return filepath.Join(home, ".simple_agent_history.json")
+}
+
+func loadHistory() []Message {
+	path := getHistoryPath()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return []Message{}
+	}
+	var messages []Message
+	if err := json.Unmarshal(data, &messages); err != nil {
+		return []Message{}
+	}
+	return messages
+}
+
+func saveHistory(messages []Message) {
+	path := getHistoryPath()
+	data, err := json.MarshalIndent(messages, "", "  ")
+	if err != nil {
+		fmt.Printf("Warning: Failed to save history: %v\n", err)
+		return
+	}
+	if err := os.WriteFile(path, data, 0644); err != nil {
+		fmt.Printf("Warning: Failed to save history: %v\n", err)
+	}
 }
