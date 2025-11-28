@@ -1046,7 +1046,7 @@ When using 'apply_udiff', provide a unified diff.
 
 								// Ask for confirmation
 								fmt.Print("Apply these changes? [y/N]: ")
-								confirm, _ := reader.ReadString('\n')
+								confirm, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 								if ctx.Err() != nil {
 									toolErr = fmt.Errorf("interrupted by user")
 								} else {
@@ -1295,7 +1295,7 @@ When using 'apply_udiff', provide a unified diff.
 
 				fmt.Printf("\n[Git] Proposed commit message: %s\n", commitMsg)
 				fmt.Print("Commit these changes? [y/N]: ")
-				confirm, _ := reader.ReadString('\n')
+				confirm, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 				confirm = strings.TrimSpace(confirm)
 
 				if strings.ToLower(confirm) == "y" {
@@ -1312,7 +1312,7 @@ When using 'apply_udiff', provide a unified diff.
 		if lastUsage > 400000 && len(messages) > 2 {
 			fmt.Printf("\n[System] Context size is %d tokens (>400,000).\n", lastUsage)
 			fmt.Print("Would you like to ask the model to shorten the context? [y/N]: ")
-			confirm, _ := reader.ReadString('\n')
+			confirm, _ := bufio.NewReader(os.Stdin).ReadString('\n')
 			if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
 				pendingInput = "The context size has exceeded 400,000 tokens. Please use the 'shorten_context' tool to summarize the conversation and reset the context."
 			}
