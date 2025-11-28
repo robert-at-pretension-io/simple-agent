@@ -859,6 +859,7 @@ func getCursorVisualPos(buf []rune, pos int, width int, promptLen int) (int, int
 func main() {
 	autoApprove := flag.Bool("auto-approve", false, "Automatically approve diffs without user confirmation")
 	continueSession := flag.Bool("continue", false, "Continue from previous session history")
+	gitAutoCommit := flag.Bool("git-auto-commit", false, "Automatically propose commits for file changes after every turn")
 	flag.Parse()
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -997,7 +998,7 @@ When using 'apply_udiff', provide a unified diff.
 			}
 			commandHistory = append(commandHistory, input)
 
-			if handleSlashCommand(input, &messages, skills, systemPrompt) {
+			if handleSlashCommand(input, &messages, skills, systemPrompt, apiKey) {
 				continue
 			}
 		}
@@ -1416,7 +1417,7 @@ When using 'apply_udiff', provide a unified diff.
 		mu.Unlock()
 
 		// End of turn: Check for git changes and propose commit
-		if isGitDirty() {
+		if *gitAutoCommit && isGitDirty() {
 			// Get conversation history for this turn
 			var turnHistory []Message
 			if startHistoryIndex < len(messages) {
@@ -1432,28 +1433,8 @@ When using 'apply_udiff', provide a unified diff.
 				}
 			}
 
-			commitMsg, err := generateCommitMessage(apiKey, turnHistory)
-			if err != nil {
-				fmt.Printf("Failed to generate commit message: %v\n", err)
-			} else {
-				// Pre-commit hook
-				hookOut := runSkillHooks(context.Background(), skills, "pre_commit", map[string]string{"message": commitMsg})
-				if hookOut != "" {
-					fmt.Printf("\n[Pre-Commit Hook Output]\n%s\n", hookOut)
-				}
-
-				fmt.Printf("\n[Git] Proposed commit message: %s\n", commitMsg)
-				fmt.Print("Commit these changes? [y/N]: ")
-				confirm, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-				confirm = strings.TrimSpace(confirm)
-
-				if strings.ToLower(confirm) == "y" {
-					if err := gitCommit(commitMsg); err != nil {
-						fmt.Printf("Git commit failed: %v\n", err)
-					} else {
-						fmt.Println("Changes committed successfully.")
-					}
-				}
+			if err := performGitCommit(apiKey, turnHistory, skills); err != nil {
+				fmt.Printf("Git commit workflow failed: %v\n", err)
 			}
 		}
 
@@ -2251,13 +2232,60 @@ func gitCommit(message string) error {
 	return nil
 }
 
-func handleSlashCommand(input string, messages *[]Message, skills []Skill, systemPrompt string) bool {
+func performGitCommit(apiKey string, history []Message, skills []Skill) error {
+	if !isGitDirty() {
+		return fmt.Errorf("git clean")
+	}
+
+	commitMsg, err := generateCommitMessage(apiKey, history)
+	if err != nil {
+		return fmt.Errorf("failed to generate commit message: %v", err)
+	}
+
+	// Pre-commit hook
+	hookOut := runSkillHooks(context.Background(), skills, "pre_commit", map[string]string{"message": commitMsg})
+	if hookOut != "" {
+		fmt.Printf("\n[Pre-Commit Hook Output]\n%s\n", hookOut)
+	}
+
+	fmt.Printf("\n[Git] Proposed commit message: %s\n", commitMsg)
+	fmt.Print("Commit these changes? [y/N]: ")
+	confirm, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	confirm = strings.TrimSpace(confirm)
+
+	if strings.ToLower(confirm) == "y" {
+		if err := gitCommit(commitMsg); err != nil {
+			return fmt.Errorf("git commit failed: %v", err)
+		}
+		fmt.Println("Changes committed successfully.")
+	} else {
+		fmt.Println("Commit aborted.")
+	}
+	return nil
+}
+
+func handleSlashCommand(input string, messages *[]Message, skills []Skill, systemPrompt string, apiKey string) bool {
 	cmd := strings.TrimSpace(input)
 	if !strings.HasPrefix(cmd, "/") {
 		return false
 	}
 
 	switch cmd {
+	case "/commit":
+		var history []Message
+		for _, m := range *messages {
+			if m.Role != "system" {
+				history = append(history, m)
+			}
+		}
+		if err := performGitCommit(apiKey, history, skills); err != nil {
+			if err.Error() == "git clean" {
+				fmt.Println("Nothing to commit (working directory clean).")
+			} else {
+				fmt.Printf("Error: %v\n", err)
+			}
+		}
+		return true
 	case "/clear":
 		*messages = []Message{
 			{
@@ -2280,6 +2308,7 @@ func handleSlashCommand(input string, messages *[]Message, skills []Skill, syste
 	case "/help":
 		fmt.Println("Available Commands:")
 		fmt.Println("  /clear   - Clear conversation history")
+		fmt.Println("  /commit  - Generate and propose a git commit")
 		fmt.Println("  /skills  - List available skills")
 		fmt.Println("  /history - Show history stats")
 		fmt.Println("  /help    - Show this help message")
