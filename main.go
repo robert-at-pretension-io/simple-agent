@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.10"
+	Version        = "v1.1.11"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1752,10 +1752,20 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 	}
 
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return string(out), fmt.Errorf("script execution failed: %w\nOutput:\n%s", err, string(out))
+	output := string(out)
+
+	// Truncate output to prevent context window overflow
+	// 40000 chars is roughly 10k tokens, which is safe for most models while providing enough context
+	const maxOutputLen = 40000
+	if len(output) > maxOutputLen {
+		truncated := len(output) - maxOutputLen
+		output = output[:maxOutputLen] + fmt.Sprintf("\n... [Output truncated. %d chars omitted] ...", truncated)
 	}
-	return string(out), nil
+
+	if err != nil {
+		return output, fmt.Errorf("script execution failed: %w\nOutput:\n%s", err, output)
+	}
+	return output, nil
 }
 
 func listFiles(path string) (string, error) {

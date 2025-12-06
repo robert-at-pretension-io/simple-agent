@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.11] - 2025-12-06
+
+### Maintenance
+- Bumped version for release testing.
+
 ## [v1.1.10] - 2025-12-06
 
 ### Fixed
