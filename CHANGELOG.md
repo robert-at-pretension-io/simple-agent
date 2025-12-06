@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.8] - 2025-12-06
+
+### Changed
+- **Smart Local Updates**: The agent now detects if it is running in a local development environment (source directory) and rebuilds itself using `go build` instead of fetching from the remote repository. This streamlines the local development workflow.
+
 ## [v1.1.7] - 2025-12-06
 
 ### Added

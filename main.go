@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.7"
+	Version        = "v1.1.8"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1510,9 +1510,17 @@ func autoUpdate() {
 		return
 	}
 
-	// Try to update the agent binary
-	cmd := exec.Command("go", "install", "github.com/robert-at-pretension-io/simple-agent@latest")
-	cmd.Env = append(os.Environ(), "GOPROXY=direct")
+	var cmd *exec.Cmd
+
+	// Check if running from source (go.mod exists and has correct module)
+	if content, err := os.ReadFile("go.mod"); err == nil && strings.Contains(string(content), "module github.com/robert-at-pretension-io/simple-agent") {
+		fmt.Println("🔧 Detected local development environment. Rebuilding from source...")
+		cmd = exec.Command("go", "build", "-o", exe)
+	} else {
+		// Try to update the agent binary from remote
+		cmd = exec.Command("go", "install", "github.com/robert-at-pretension-io/simple-agent@latest")
+		cmd.Env = append(os.Environ(), "GOPROXY=direct")
+	}
 	// We suppress output unless there is an error to keep startup clean
 	if out, err := cmd.CombinedOutput(); err != nil {
 		// Update failed (no internet? no go? upstream down?) - non-fatal
