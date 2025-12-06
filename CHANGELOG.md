@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.9] - 2025-12-06
+
+### Removed
+- **Search Files Tool**: Removed the `search_files` tool from the core agent to streamline functionality.
+
 ## [v1.1.8] - 2025-12-06
 
 ### Changed

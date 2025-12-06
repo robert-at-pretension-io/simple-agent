@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.8"
+	Version        = "v1.1.9"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -188,27 +188,6 @@ var listFilesTool = Tool{
 	},
 }
 
-var searchFilesTool = Tool{
-	Type: "function",
-	Function: FunctionDefinition{
-		Name:        "search_files",
-		Description: "Search for a text pattern in files within a directory.",
-		Parameters: json.RawMessage(`{
-			"type": "object",
-			"properties": {
-				"path": {
-					"type": "string",
-					"description": "The directory path to search in (default: .)"
-				},
-				"regex": {
-					"type": "string",
-					"description": "The regular expression pattern to search for"
-				}
-			},
-			"required": ["regex"]
-		}`),
-	},
-}
 
 var shortenContextTool = Tool{
 	Type: "function",
@@ -1054,7 +1033,7 @@ When using 'apply_udiff', provide a unified diff.
 			reqBody := ChatCompletionRequest{
 				Model:     ModelName,
 				Messages:  messages,
-				Tools:     []Tool{udiffTool, readFileTool, runScriptTool, listFilesTool, searchFilesTool, shortenContextTool},
+				Tools:     []Tool{udiffTool, readFileTool, runScriptTool, listFilesTool, shortenContextTool},
 				ExtraBody: json.RawMessage(`{"google": {"thinking_config": {"include_thoughts": true}}}`),
 			}
 
@@ -1308,18 +1287,6 @@ When using 'apply_udiff', provide a unified diff.
 							toolResult, toolErr = listFiles(args.Path)
 						}
 
-					case "search_files":
-						fmt.Printf("\n\033[1;35m🛠  Tool Call: search_files\033[0m\n")
-						var args struct {
-							Path  string `json:"path"`
-							Regex string `json:"regex"`
-						}
-						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-							toolErr = fmt.Errorf("error parsing arguments: %v", err)
-						} else {
-							fmt.Printf("Searching files in %s for: %s\n", args.Path, args.Regex)
-							toolResult, toolErr = searchFiles(args.Path, args.Regex)
-						}
 
 					case "shorten_context":
 						fmt.Printf("\n\033[1;35m🛠  Tool Call: shorten_context\033[0m\n")
@@ -1816,77 +1783,6 @@ func listFiles(path string) (string, error) {
 	return sb.String(), nil
 }
 
-func searchFiles(root string, pattern string) (string, error) {
-	absPath, err := validatePath(root)
-	if err != nil {
-		return "", err
-	}
-
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return "", fmt.Errorf("invalid regex: %w", err)
-	}
-	var sb strings.Builder
-	matchCount := 0
-
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	err = filepath.WalkDir(absPath, func(path string, d fs.DirEntry, err error) error {
-		// Check context
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules" {
-				return fs.SkipDir
-			}
-			return nil
-		}
-
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-
-		lines := strings.Split(string(content), "\n")
-		for i, line := range lines {
-			if re.MatchString(line) {
-				sb.WriteString(fmt.Sprintf("%s:%d: %s\n", path, i+1, strings.TrimSpace(line)))
-				matchCount++
-				if matchCount > 100 {
-					return fmt.Errorf("too many matches")
-				}
-			}
-		}
-		return nil
-	})
-
-	if err != nil {
-		if err == context.DeadlineExceeded {
-			sb.WriteString("\n... (search timed out after 30s)")
-			return sb.String(), nil
-		}
-		if err.Error() != "too many matches" {
-			return "", fmt.Errorf("search failed: %w", err)
-		}
-	}
-
-	if matchCount == 0 {
-		return "No matches found.", nil
-	}
-	if matchCount > 100 {
-		sb.WriteString("... (results truncated)")
-	}
-	return sb.String(), nil
-}
 
 // applyUDiff applies a unified diff to a file
 func applyUDiff(ctx context.Context, path string, diff string, dryRun bool) (string, error) {
