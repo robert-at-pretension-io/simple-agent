@@ -41,7 +41,7 @@ A simple REPL for interacting with Gemini 3.0 Pro Preview using the OpenAI-compa
 
 ## Versioning
 
-This project follows semantic versioning. The current version is `v1.1.2`.
+This project follows semantic versioning. The current version is `v1.1.3`.
 To check the installed version, run:
 ```bash
 simple-agent --version
@@ -51,3 +51,8 @@ simple-agent --version
 
 - **Maintain a Changelog**: All version changes will be documented to ensure transparency and easy upgrades.
 - **Robust Installation**: Ensure seamless installation via `go install` across different environments.
+
+## Configuration
+
+- **Auto-Accept Diffs**: By default, the agent automatically accepts proposed file changes. To require manual confirmation, use the `--no-auto-accept` flag.
+- **Auto-Update**: The agent checks for updates on startup. Use `--no-update` to disable.

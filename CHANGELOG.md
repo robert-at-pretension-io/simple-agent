@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.3] - 2025-12-06
+
+### Changed
+- Changed default behavior to **auto-accept** file differences. Use `--no-auto-accept` to restore manual confirmation behavior.
+
 ## [v1.1.2] - 2025-12-06
 
 ### Added
