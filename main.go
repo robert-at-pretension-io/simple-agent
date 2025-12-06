@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.4"
+	Version        = "v1.1.5"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1526,6 +1526,14 @@ func autoUpdate() {
 	// Check if binary was updated
 	if infoAfter, err := os.Stat(exe); err == nil {
 		if infoAfter.ModTime().After(infoBefore.ModTime()) {
+			// Verify if the version actually changed to prevent restart loops
+			if out, err := exec.Command(exe, "--version").CombinedOutput(); err == nil {
+				newVer := strings.TrimSpace(string(out))
+				if newVer == fmt.Sprintf("Simple Agent %s", Version) {
+					return // Same version, continue running
+				}
+			}
+
 			fmt.Println("✅ Update installed. Please restart the agent.")
 			os.Exit(0)
 		}
