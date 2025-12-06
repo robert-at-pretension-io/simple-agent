@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.7] - 2025-12-06
+
+### Added
+- **Background Manager Skill**: New skill `background-manager` for running detached processes with persistent state, encryption (AES-256-CBC), and log management.
+
 ## [v1.1.6] - 2025-12-06
 
 ### Added
