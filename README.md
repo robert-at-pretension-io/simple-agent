@@ -38,3 +38,16 @@ A simple REPL for interacting with Gemini 3.0 Pro Preview using the OpenAI-compa
 - Type your message at the `> ` prompt and press Enter.
 - The model can reply with text or call the `apply_udiff` tool to modify files in the current directory.
 - Press `Ctrl+C` to exit.
+
+## Versioning
+
+This project follows semantic versioning. The current version is `v1.1.0`.
+To check the installed version, run:
+```bash
+simple-agent --version
+```
+
+## Project Goals
+
+- **Maintain a Changelog**: All version changes will be documented to ensure transparency and easy upgrades.
+- **Robust Installation**: Ensure seamless installation via `go install` across different environments.
