@@ -63,6 +63,12 @@ def main():
             
         pid = proc.pid
         
+        # Wait briefly to ensure supervisor starts successfully (e.g. openssl check)
+        time.sleep(0.5)
+        if proc.poll() is not None:
+            print(f"Failed to start process (Exit Code: {proc.returncode}). Check BG_PASSWORD.")
+            sys.exit(1)
+        
         state = load_state()
         state[process_id] = {
             "id": process_id,

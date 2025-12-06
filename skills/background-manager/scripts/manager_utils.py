@@ -42,8 +42,8 @@ def load_state():
             finally:
                 fcntl.flock(lockf, fcntl.LOCK_UN)
     except subprocess.CalledProcessError as e:
-        print(f"Error decrypting state: {e.stderr.decode()}", file=sys.stderr)
-        return {}
+        print(f"Error decrypting state (wrong password?): {e.stderr.decode()}", file=sys.stderr)
+        sys.exit(1)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error reading state: {e}", file=sys.stderr)
         return {}

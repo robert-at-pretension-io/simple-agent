@@ -37,9 +37,18 @@ def main():
         
     # Write to FIFO
     text_to_send = args.text + ("" if args.no_newline else "\n")
-    with open(input_file, "w") as f:
-        f.write(text_to_send)
-        print(f"Sent input to {process_id}")
+    try:
+        # Open non-blocking to avoid hanging if no reader (process dead)
+        fd = os.open(input_file, os.O_WRONLY | os.O_NONBLOCK)
+        with os.fdopen(fd, "w") as f:
+            f.write(text_to_send)
+            print(f"Sent input to {process_id}")
+    except OSError as e:
+        if e.errno == 6: # ENXIO: No such device or address (no reader)
+            print(f"Error: Process {process_id} is not listening (it may be stopped or crashed).")
+            sys.exit(1)
+        else:
+            raise e
 
 if __name__ == "__main__":
     main()

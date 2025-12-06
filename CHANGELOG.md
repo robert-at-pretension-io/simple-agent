@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.10] - 2025-12-06
+
+### Fixed
+- **Background Manager Reliability**:
+    - Fixed data loss risk in `manager_utils.py` where a wrong password could wipe the state file.
+    - Fixed optimistic state in `start_process.py` to ensure processes actually start before being recorded.
+    - Fixed potential OOM crash in `get_logs.py` by streaming large logs instead of loading them entirely into RAM.
+    - Fixed hanging behavior in `send_input.py` by using non-blocking checks for the input FIFO.
+- **Documentation**: Added technical architecture details to `background-manager/SKILL.md`.
+
 ## [v1.1.9] - 2025-12-06
 
 ### Removed

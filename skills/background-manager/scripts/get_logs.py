@@ -39,15 +39,24 @@ def main():
             '-pass', 'env:BG_PASSWORD',
             '-in', log_file
         ]
-        result = subprocess.run(cmd, check=False, capture_output=True)
-        content = result.stdout.decode('utf-8', errors='replace')
-        lines = content.splitlines(keepends=True)
-            
-        if args.lines > 0 and len(lines) > args.lines:
-            lines = lines[-args.lines:]
-            
-        print(f"--- Logs for {process_id} (last {len(lines)} lines) ---")
-        print("".join(lines))
+        
+        print(f"--- Logs for {process_id} ---")
+        
+        # Use Popen to stream output instead of buffering in memory
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        if args.lines <= 0:
+            # Print all lines directly
+            for line in proc.stdout:
+                print(line.decode('utf-8', errors='replace'), end='')
+        else:
+            from collections import deque
+            # Use deque to keep only the last N lines in memory
+            last_lines = deque(proc.stdout, maxlen=args.lines)
+            for line in last_lines:
+                print(line.decode('utf-8', errors='replace'), end='')
+
+        proc.wait()
         
     except Exception as e:
         print(f"Error reading log file: {e}")

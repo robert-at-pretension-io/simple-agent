@@ -100,3 +100,16 @@ python3 skills/background-manager/scripts/send_input.py a1b2 "yes"
 
 - **State File:** `skills/background-manager/data/processes.json.enc` (Encrypted)
 - **Logs Directory:** `skills/background-manager/data/logs/` (*.log.enc)
+
+## Technical Architecture
+
+### Interactivity & Process Management
+The skill handles interactivity using a combination of **Named Pipes (FIFOs)** and **Pseudo-Terminals (PTYs)**.
+
+1.  **The Channel**: A FIFO is created at `data/inputs/<id>.in` for each process.
+2.  **The Bridge**: `process_supervisor.py` spawns the actual command inside a PTY (`pty.fork()`). It bridges the gap by:
+    -   Reading output from the PTY master and encrypting it to the log file.
+    -   Reading input from the FIFO and writing it to the PTY master (simulating user typing).
+3.  **The Sender**: `send_input.py` writes to the FIFO, sending text directly to the process's standard input.
+
+This setup ensures that interactive applications (like REPLs) behave correctly, properly flushing output and accepting input even when running in the background.
