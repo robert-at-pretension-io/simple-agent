@@ -1012,6 +1012,10 @@ When using 'apply_udiff', provide a unified diff.
 				if err == io.EOF {
 					break
 				}
+				if err.Error() == "interrupted" {
+					fmt.Println("^C")
+					continue
+				}
 				fmt.Printf("Error reading input: %v\n", err)
 				os.Exit(1)
 			}
