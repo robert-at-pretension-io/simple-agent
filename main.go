@@ -29,6 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
+	Version        = "v1.1.0"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -860,11 +861,17 @@ func getCursorVisualPos(buf []rune, pos int, width int, promptLen int) (int, int
 // --- Main ---
 
 func main() {
+	versionFlag := flag.Bool("version", false, "Print version and exit")
 	autoApprove := flag.Bool("auto-approve", false, "Automatically approve diffs without user confirmation")
 	continueSession := flag.Bool("continue", false, "Continue from previous session history")
 	gitAutoCommit := flag.Bool("git-auto-commit", false, "Automatically propose commits for file changes after every turn")
 	gitForceCommit := flag.Bool("git-force-commit", false, "Automatically commit changes without confirmation (implies -git-auto-commit)")
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Printf("Simple Agent %s\n", Version)
+		os.Exit(0)
+	}
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
