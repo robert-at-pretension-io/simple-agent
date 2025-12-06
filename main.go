@@ -1644,6 +1644,25 @@ func parseArgs(command string) ([]string, error) {
 }
 
 func runSafeScript(ctx context.Context, scriptPath string, args []string, skillsPrompt string) (string, error) {
+	// Resolve virtual "skills/" path to CoreSkillsDir if needed.
+	// This allows the agent to find scripts using the standard "skills/..." path
+	// even when running from a binary installation where skills are in CoreSkillsDir.
+	if CoreSkillsDir != "" {
+		cleanPath := filepath.Clean(scriptPath)
+		magicPrefix := "skills" + string(os.PathSeparator)
+		if strings.HasPrefix(cleanPath, magicPrefix) {
+			// Check if local file exists
+			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+				// Not found locally. Try mapping to CoreSkillsDir.
+				suffix := strings.TrimPrefix(cleanPath, magicPrefix)
+				candidatePath := filepath.Join(CoreSkillsDir, suffix)
+				if _, err := os.Stat(candidatePath); err == nil {
+					scriptPath = candidatePath
+				}
+			}
+		}
+	}
+
 	// Validate path
 	absPath, err := validatePath(scriptPath)
 	if err != nil {
