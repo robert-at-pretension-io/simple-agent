@@ -2,7 +2,11 @@
 
 ## Prerequisites
 
-- **Go**: Version 1.21 or higher. [Download Go](https://go.dev/dl/)
+- **Go**: Version 1.21 or higher.
+  - **macOS**: `brew install go`
+  - **Windows**: `winget install GoLang.Go`
+  - **Linux**: `sudo snap install go --classic`
+  - **Manual**: [Download from go.dev](https://go.dev/dl/)
 - **Git**: [Download Git](https://git-scm.com/downloads)
 
 ## Installation
