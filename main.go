@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.3"
+	Version        = "v1.1.4"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1499,6 +1499,17 @@ func startSpinner(stopChan chan struct{}, doneChan chan struct{}) {
 
 func autoUpdate() {
 	fmt.Println("Checking for updates...")
+
+	// Get current executable info to check for changes
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	infoBefore, err := os.Stat(exe)
+	if err != nil {
+		return
+	}
+
 	// Try to update the agent binary
 	cmd := exec.Command("go", "install", "github.com/robert-at-pretension-io/simple-agent@latest")
 	cmd.Env = append(os.Environ(), "GOPROXY=direct")
@@ -1508,6 +1519,15 @@ func autoUpdate() {
 		fmt.Printf("⚠️  Auto-update failed: %v\n", err)
 		if len(out) > 0 {
 			fmt.Printf("%s\n", out)
+		}
+		return
+	}
+
+	// Check if binary was updated
+	if infoAfter, err := os.Stat(exe); err == nil {
+		if infoAfter.ModTime().After(infoBefore.ModTime()) {
+			fmt.Println("✅ Update installed. Please restart the agent.")
+			os.Exit(0)
 		}
 	}
 }

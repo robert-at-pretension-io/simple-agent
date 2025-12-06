@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.4] - 2025-12-06
+
+### Changed
+- **Auto-Update Behavior**: The agent now exits immediately if an update is successfully installed, forcing a restart to ensure the new version is used.
+
 ## [v1.1.3] - 2025-12-06
 
 ### Changed
