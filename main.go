@@ -101,7 +101,7 @@ var udiffTool = Tool{
 	Type: "function",
 	Function: FunctionDefinition{
 		Name:        "apply_udiff",
-		Description: "Apply a unified diff to a file. The diff should be in standard unified format (diff -U0), including headers. IMPORTANT: Context lines are mandatory for insertions.",
+		Description: "Apply a unified diff to a file. The diff should be in standard unified format (diff -U0), including headers. IMPORTANT: Context lines are mandatory for insertions. You must include at least 2 lines of context around your changes. A hunk with only '+' lines is invalid (unless creating a new file). Ensure enough context is provided to uniquely locate the code.",
 		Parameters: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -528,6 +528,13 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 	return output.String()
 }
 
+// restoreTerminal restores the terminal to canonical mode and echo.
+func restoreTerminal() {
+	cmd := exec.Command("stty", "icanon", "echo")
+	cmd.Stdin = os.Stdin
+	_ = cmd.Run()
+}
+
 // readInteractiveInput reads input in raw mode to support arrow keys and multi-line editing.
 // It handles basic line wrapping and cursor movement.
 func readInteractiveInput(reader *bufio.Reader, history []string) (string, error) {
@@ -538,11 +545,7 @@ func readInteractiveInput(reader *bufio.Reader, history []string) (string, error
 		// Fallback for non-POSIX or error: use the provided reader
 		return reader.ReadString('\n')
 	}
-	defer func() {
-		cmd := exec.Command("stty", "icanon", "echo")
-		cmd.Stdin = os.Stdin
-		cmd.Run()
-	}()
+	defer restoreTerminal()
 
 	var buf []rune
 	cursor := 0
@@ -918,6 +921,7 @@ func main() {
 				currentCancel()
 				currentCancel = nil
 			} else {
+				restoreTerminal()
 				fmt.Println("\nExiting...")
 				os.Exit(0)
 			}

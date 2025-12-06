@@ -36,6 +36,29 @@ skill-name/
     └── assets/           - Files used in output
 ```
 
+### Hooks (Optional)
+
+Hooks allow you to automate workflows by triggering scripts on specific system events. Define them in the `SKILL.md` frontmatter.
+
+**Supported Hooks:**
+- **`startup`**: Runs at session start (e.g., check dependencies).
+- **`pre_edit` / `post_edit`**: Runs before/after `apply_udiff`. Useful for linting or testing.
+- **`pre_view` / `post_view`**: Runs before/after `read_file`.
+- **`pre_run` / `post_run`**: Runs before/after `run_script`.
+- **`pre_commit`**: Runs before the agent proposes a git commit.
+
+**Example Frontmatter:**
+```yaml
+---
+name: my-skill
+description: ...
+hooks:
+  startup: scripts/check_deps.sh
+  post_edit: scripts/lint.sh
+  pre_commit: scripts/test.sh
+---
+```
+
 ## Skill Creation Process
 
 ### Step 1: Initialize the Skill
@@ -54,7 +77,7 @@ This generates:
 ### Step 2: Edit the Skill
 
 #### SKILL.md
-- **Frontmatter**: `name` (hyphen-case), `description` (triggers).
+- **Frontmatter**: `name` (hyphen-case), `description` (triggers), `hooks` (optional).
 - **Body**: Imperative instructions. Keep it concise (< 500 lines).
 
 #### Bundled Resources

@@ -1,4 +1,4 @@
-module gemini-repl
+module github.com/robert-at-pretension-io/simple-agent
 
 go 1.21
 // Testing edit again
