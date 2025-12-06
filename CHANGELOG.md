@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.6] - 2025-12-06
+
+### Added
+- **Web Browser Skill**: New skill `web-browser` with capabilities to search the web (Brave Search) and browse/scrape pages (ScrapingBee).
+
+### Fixed
+- **Search Timeout**: Added a 30-second timeout to the `search_files` tool to prevent it from hanging indefinitely on large directories or slow file systems.
+
 ## [v1.1.5] - 2025-12-06
 
 ### Fixed

@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.5"
+	Version        = "v1.1.6"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1817,7 +1817,18 @@ func searchFiles(root string, pattern string) (string, error) {
 	var sb strings.Builder
 	matchCount := 0
 
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	err = filepath.WalkDir(absPath, func(path string, d fs.DirEntry, err error) error {
+		// Check context
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		if err != nil {
 			return nil
 		}
@@ -1846,8 +1857,14 @@ func searchFiles(root string, pattern string) (string, error) {
 		return nil
 	})
 
-	if err != nil && err.Error() != "too many matches" {
-		return "", fmt.Errorf("search failed: %w", err)
+	if err != nil {
+		if err == context.DeadlineExceeded {
+			sb.WriteString("\n... (search timed out after 30s)")
+			return sb.String(), nil
+		}
+		if err.Error() != "too many matches" {
+			return "", fmt.Errorf("search failed: %w", err)
+		}
 	}
 
 	if matchCount == 0 {
