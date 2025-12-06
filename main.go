@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.0"
+	Version        = "v1.1.1"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1536,6 +1536,22 @@ func validatePath(path string) (string, error) {
 	if path == "" {
 		path = "."
 	}
+
+	// Resolve virtual "skills/" path to CoreSkillsDir if needed
+	if CoreSkillsDir != "" {
+		cleanPath := filepath.Clean(path)
+		magicPrefix := "skills" + string(os.PathSeparator)
+		if strings.HasPrefix(cleanPath, magicPrefix) {
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				suffix := strings.TrimPrefix(cleanPath, magicPrefix)
+				candidatePath := filepath.Join(CoreSkillsDir, suffix)
+				if _, err := os.Stat(candidatePath); err == nil {
+					path = candidatePath
+				}
+			}
+		}
+	}
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get CWD: %w", err)
@@ -1651,25 +1667,6 @@ func parseArgs(command string) ([]string, error) {
 }
 
 func runSafeScript(ctx context.Context, scriptPath string, args []string, skillsPrompt string) (string, error) {
-	// Resolve virtual "skills/" path to CoreSkillsDir if needed.
-	// This allows the agent to find scripts using the standard "skills/..." path
-	// even when running from a binary installation where skills are in CoreSkillsDir.
-	if CoreSkillsDir != "" {
-		cleanPath := filepath.Clean(scriptPath)
-		magicPrefix := "skills" + string(os.PathSeparator)
-		if strings.HasPrefix(cleanPath, magicPrefix) {
-			// Check if local file exists
-			if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
-				// Not found locally. Try mapping to CoreSkillsDir.
-				suffix := strings.TrimPrefix(cleanPath, magicPrefix)
-				candidatePath := filepath.Join(CoreSkillsDir, suffix)
-				if _, err := os.Stat(candidatePath); err == nil {
-					scriptPath = candidatePath
-				}
-			}
-		}
-	}
-
 	// Validate path
 	absPath, err := validatePath(scriptPath)
 	if err != nil {

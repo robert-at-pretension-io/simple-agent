@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.1] - 2025-12-06
+
+### Fixed
+- Universal fix for `skills/` path resolution. Now works for `read_file`, `list_files`, and `run_script` by handling mapping in the central path validator.
+
 ## [v1.1.0] - 2025-12-06
 
 ### Added
