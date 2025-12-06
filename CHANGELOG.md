@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.2] - 2025-12-06
+
+### Added
+- Auto-update at startup: The agent now automatically runs `go install ...@latest` on startup to ensure it is up to date. Use `--no-update` to skip.
+
 ## [v1.1.1] - 2025-12-06
 
 ### Fixed

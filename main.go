@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.1"
+	Version        = "v1.1.2"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -862,6 +862,7 @@ func getCursorVisualPos(buf []rune, pos int, width int, promptLen int) (int, int
 
 func main() {
 	versionFlag := flag.Bool("version", false, "Print version and exit")
+	noUpdate := flag.Bool("no-update", false, "Skip auto-update check at startup")
 	autoApprove := flag.Bool("auto-approve", false, "Automatically approve diffs without user confirmation")
 	continueSession := flag.Bool("continue", false, "Continue from previous session history")
 	gitAutoCommit := flag.Bool("git-auto-commit", false, "Automatically propose commits for file changes after every turn")
@@ -871,6 +872,10 @@ func main() {
 	if *versionFlag {
 		fmt.Printf("Simple Agent %s\n", Version)
 		os.Exit(0)
+	}
+
+	if !*noUpdate && !*versionFlag {
+		autoUpdate()
 	}
 
 	apiKey := os.Getenv("GEMINI_API_KEY")
@@ -1484,6 +1489,21 @@ func startSpinner(stopChan chan struct{}, doneChan chan struct{}) {
 			elapsed := time.Since(start).Round(time.Second)
 			fmt.Printf("\r%c Waiting... (%s)", chars[i%len(chars)], elapsed)
 			i++
+		}
+	}
+}
+
+func autoUpdate() {
+	fmt.Println("Checking for updates...")
+	// Try to update the agent binary
+	cmd := exec.Command("go", "install", "github.com/robert-at-pretension-io/simple-agent@latest")
+	cmd.Env = append(os.Environ(), "GOPROXY=direct")
+	// We suppress output unless there is an error to keep startup clean
+	if out, err := cmd.CombinedOutput(); err != nil {
+		// Update failed (no internet? no go? upstream down?) - non-fatal
+		fmt.Printf("⚠️  Auto-update failed: %v\n", err)
+		if len(out) > 0 {
+			fmt.Printf("%s\n", out)
 		}
 	}
 }
