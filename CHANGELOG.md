@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.34]
+
+### Fixed
+- **CI/CD**: Fixed the GitHub Actions workflow to ensure release binaries are correctly uploaded. Upgraded to `action-gh-release@v2` and improved file matching logic.
+
 ## [v1.1.33]
 
 ### Fixed

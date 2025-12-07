@@ -2,7 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.33
+- **Current Version**: v1.1.34
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -42,3 +42,4 @@
 - **v1.1.31 (2025-05-15)**: Enhanced UX by adding Version and Model Name to the interactive Welcome message, ensuring visibility.
 - **v1.1.32 (2025-05-15)**: Fixed self-update mechanism to support in-place updates. ADDED CRITICAL FALLBACK: If `install.sh` fails, `autoUpdate` now attempts `go install` to ensure legacy clients can still update.
 - **v1.1.33 (2025-05-15)**: REMOVED "legacy cleanup" logic. It was deleting the binary after in-place updates via `go install`. Lesson: Do not assume `go install` is "legacy" or that users want to switch to the binary channel. Support both equally.
+- **v1.1.34 (2025-05-15)**: Fixed GitHub Actions release workflow. Upgraded `softprops/action-gh-release` to v2 and used glob patterns to reliably find and upload binary assets.
