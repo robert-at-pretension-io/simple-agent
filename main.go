@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.22"
+	Version        = "v1.1.23"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -496,7 +496,7 @@ func readSkillBody(path string) (string, error) {
 
 // restoreTerminal restores the terminal to canonical mode and echo.
 func restoreTerminal() {
-	cmd := exec.Command("stty", "icanon", "echo")
+	cmd := exec.Command("stty", "icanon", "echo", "isig")
 	cmd.Stdin = os.Stdin
 	_ = cmd.Run()
 }
@@ -505,7 +505,7 @@ func restoreTerminal() {
 // It handles basic line wrapping and cursor movement.
 func readInteractiveInput(reader *bufio.Reader, history []string) (string, error) {
 	// Attempt to set raw mode
-	cmd := exec.Command("stty", "-icanon", "-echo")
+	cmd := exec.Command("stty", "-icanon", "-echo", "-isig")
 	cmd.Stdin = os.Stdin
 	if err := cmd.Run(); err != nil {
 		// Fallback for non-POSIX or error: use the provided reader
@@ -518,6 +518,7 @@ func readInteractiveInput(reader *bufio.Reader, history []string) (string, error
 	currentVisualRow := 0 // Track cursor row relative to prompt start
 	historyIndex := len(history)
 	var currentInputDraft []rune
+	var lastCtrlC time.Time
 
 	isFirstLine := func() bool {
 		for i := cursor - 1; i >= 0; i-- {
@@ -596,7 +597,22 @@ func readInteractiveInput(reader *bufio.Reader, history []string) (string, error
 		s := string(bufRead[:n])
 
 		if s == "\x03" { // Ctrl+C
-			return "", fmt.Errorf("interrupted")
+			if len(buf) > 0 {
+				fmt.Println("^C")
+				buf = []rune{}
+				cursor = 0
+				currentVisualRow = 0
+				redraw()
+				continue
+			}
+			if time.Since(lastCtrlC) < 1*time.Second {
+				return "", fmt.Errorf("interrupted")
+			}
+			lastCtrlC = time.Now()
+			fmt.Println("^C\n(Press Ctrl+C again to exit)")
+			currentVisualRow = 0
+			redraw()
+			continue
 		} else if s == "\x04" { // Ctrl+D
 			if len(buf) == 0 {
 				return "", io.EOF
@@ -894,6 +910,8 @@ func main() {
 	var currentCancel context.CancelFunc
 	var mu sync.Mutex
 
+	var lastSignalTime time.Time
+
 	go func() {
 		for range sigChan {
 			mu.Lock()
@@ -902,9 +920,13 @@ func main() {
 				currentCancel()
 				currentCancel = nil
 			} else {
-				restoreTerminal()
-				fmt.Println("\nExiting...")
-				os.Exit(0)
+				if time.Since(lastSignalTime) < 1*time.Second {
+					restoreTerminal()
+					fmt.Println("\nExiting...")
+					os.Exit(0)
+				}
+				lastSignalTime = time.Now()
+				fmt.Println("\n(Press Ctrl+C again to exit)")
 			}
 			mu.Unlock()
 		}
@@ -919,6 +941,11 @@ When using 'apply_udiff', provide a unified diff.
 - Use ' ' for context, '-' for removal, '+' for addition.
 - **ALWAYS** include at least 2 lines of context around your changes.
 - **Context is MANDATORY**: When inserting code, you must include existing lines around the insertion point. A hunk with only '+' lines is invalid (unless creating a new file).
+- **How to Include Context**:
+  1.  **Identify the Target**: Find the code you want to change and 2-3 lines of stable code above and below it.
+  2.  **Copy Verbatim**: Copy the surrounding lines EXACTLY as they appear in the file.
+  3.  **Prefix with Space**: Add a single space ' ' to the beginning of these context lines.
+  4.  **Combine**: Surround your '-' (removal) and '+' (addition) lines with these ' ' (context) lines.
 - **COMMON ISSUE**: The most frequent cause of failure is insufficient or mismatched context. Provide ample, unique context lines (more than 2 if needed) to ensure the patch applies correctly.
 - Do not include line numbers in the hunk header.
 - Ensure enough context is provided to uniquely locate the code.
@@ -990,8 +1017,9 @@ When using 'apply_udiff', provide a unified diff.
 					break
 				}
 				if err.Error() == "interrupted" {
-					fmt.Println("^C")
-					continue
+					restoreTerminal()
+					fmt.Println("Exiting...")
+					os.Exit(0)
 				}
 				fmt.Printf("Error reading input: %v\n", err)
 				os.Exit(1)

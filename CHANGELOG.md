@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.23] - 2025-12-07
+
+### Improved
+- **System Prompt**: Added explicit "How to Include Context" instructions to the `apply_udiff` tool guidelines to reduce common context-related errors.
+
 ## [v1.1.12] - 2025-12-07
 
 ### Refactor
