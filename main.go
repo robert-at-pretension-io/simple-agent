@@ -32,7 +32,7 @@ var installScript []byte
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.32"
+	Version        = "v1.1.33"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1529,17 +1529,6 @@ func autoUpdate() {
 		os.Exit(0)
 	}
 
-	// Migration Cleanup: If running from 'go install' path, remove the old binary
-	if strings.Contains(exe, filepath.Join("go", "bin")) {
-		fmt.Printf("Cleaning up legacy binary at %s...\n", exe)
-		if err := os.Remove(exe); err != nil {
-			fmt.Printf("⚠️  Failed to remove legacy binary: %v\n", err)
-			fmt.Println("Please manually remove it and ensure ~/.local/bin is in your PATH.")
-		} else {
-			fmt.Println("✅ Legacy binary removed.\n✅ Update complete. Please restart the agent (ensure ~/.local/bin is in your PATH).")
-			os.Exit(0)
-		}
-	}
 
 	// Check if binary was updated
 	if infoAfter, err := os.Stat(exe); err == nil {

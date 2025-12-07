@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.33]
+
+### Fixed
+- **Critical**: Removed aggressive "migration cleanup" logic that caused the agent to delete itself after an in-place update when running from the `go/bin` directory. This ensures `go install` remains a first-class, supported installation method.
+
 ## [v1.1.32]
 
 ### Fixed
