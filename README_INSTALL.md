@@ -1,8 +1,8 @@
 # Installation Guide
 
-## Prerequisites
-
-- **Go**: Version 1.21 or higher.
+## Prerequisites (Source Install Only)
+If you plan to build from source (Option 2), you need:
+- **Go**: Version 1.21 or higher
   - **macOS**: `brew install go`
   - **Windows**: `winget install GoLang.Go`
   - **Linux**: `sudo snap install go --classic`
@@ -11,6 +11,14 @@
 
 ## Installation
 
+### Option 1: Quick Install Script (Linux/macOS)
+Does not require Go. Downloads the latest binary for your system.
+
+```bash
+curl -sL https://raw.githubusercontent.com/robert-at-pretension-io/simple-agent/main/install.sh | sh
+```
+
+### Option 2: Install from Source
 You can install `simple-agent` directly from the source using the `go install` command:
 
 ```bash
