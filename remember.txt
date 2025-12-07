@@ -2,7 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.23
+- **Current Version**: v1.1.24
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -10,6 +10,11 @@
   - *Problem*: Agents often fail to apply unified diffs because they provide insufficient or mismatched context lines.
   - *Solution*: The system prompt (in `main.go`) now includes a specific "How to Include Context" section with 4 explicit steps (Identify, Copy, Prefix, Combine).
   - *Lesson*: Be extremely explicit about format requirements in the system prompt. Don't just say "include context", explain *how* to construct the block.
+
+- **Memory Persistence**:
+  - *Problem*: Agents often forget to check or update project memory (`remember.txt`).
+  - *Solution*: Added a dedicated "**PROJECT MEMORY**" section to the system prompt in `main.go`.
+  - *Lesson*: Instructions to "remember" must be proactive and unconditional in the system prompt, not just hidden in tool descriptions.
 
 ## Release Workflow
 When releasing a major feature or fix:
@@ -20,3 +25,4 @@ When releasing a major feature or fix:
 
 ## Recent History
 - **v1.1.23 (2025-12-07)**: Updated system prompt to improve `apply_udiff` reliability by enforcing context rules.
+- **v1.1.24 (2025-12-07)**: Updated system prompt to explicitly enforce `remember.txt` usage and persistence.
