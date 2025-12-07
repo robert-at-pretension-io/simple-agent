@@ -32,7 +32,7 @@ var installScript []byte
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.38"
+	Version        = "v1.1.39"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1496,6 +1496,38 @@ func getLatestVersion() (string, error) {
 	return release.TagName, nil
 }
 
+func parseVersion(v string) []int {
+	v = strings.TrimPrefix(v, "v")
+	parts := strings.Split(v, ".")
+	var res []int
+	for _, p := range parts {
+		i, _ := strconv.Atoi(p)
+		res = append(res, i)
+	}
+	return res
+}
+
+func isNewer(current, latest string) bool {
+	c := parseVersion(current)
+	l := parseVersion(latest)
+
+	lenC := len(c)
+	lenL := len(l)
+	maxLen := lenC
+	if lenL > maxLen {
+		maxLen = lenL
+	}
+
+	for i := 0; i < maxLen; i++ {
+		vC, vL := 0, 0
+		if i < lenC { vC = c[i] }
+		if i < lenL { vL = l[i] }
+		if vL > vC { return true }
+		if vL < vC { return false }
+	}
+	return false
+}
+
 func autoUpdate() {
 	fmt.Println("Checking for updates...")
 
@@ -1505,7 +1537,7 @@ func autoUpdate() {
 		return
 	}
 
-	if latest == Version {
+	if !isNewer(Version, latest) {
 		fmt.Println("✅ You are using the latest version.")
 		return
 	}
