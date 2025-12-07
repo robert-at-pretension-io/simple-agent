@@ -2,7 +2,8 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.26
+- **Current Version**: v1.1.27
+- **Status**: v1.1.27 tagged and pushed. GitHub Actions release workflow triggered.
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
