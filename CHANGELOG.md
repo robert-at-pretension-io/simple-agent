@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.35]
+
+### Fixed
+- **Build**: Fixed a compile error ("out declared and not used") in the new `autoUpdate` fallback logic. This restores successful builds in the CI/CD pipeline.
+
 ## [v1.1.34]
 
 ### Fixed

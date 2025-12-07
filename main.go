@@ -32,7 +32,7 @@ var installScript []byte
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.34"
+	Version        = "v1.1.35"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1523,6 +1523,9 @@ func autoUpdate() {
 		cmd.Env = append(os.Environ(), "GOPROXY=direct")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fmt.Printf("⚠️  Fallback update failed: %v\n", err)
+			if len(out) > 0 {
+				fmt.Printf("Output:\n%s\n", out)
+			}
 			return
 		}
 		fmt.Println("✅ Fallback update complete via 'go install'. Please restart.")

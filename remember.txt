@@ -2,7 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.34
+- **Current Version**: v1.1.35
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -20,6 +20,11 @@
   - *Problem*: Tools (like `grep` or `cat`) sometimes produce massive output (>100k tokens), causing API errors (Status 400) and crashing the agent's context.
   - *Solution*: Modified `runSafeScript` in `main.go` to check output length. Outputs > 50,000 characters are now automatically saved to a file in `.simple_agent/outputs/`, and the agent receives a pointer to that file instead of the raw data.
   - *Lesson*: Always bound tool outputs. The LLM context window is finite; file-based offloading is a robust fallback for "firehose" data.
+
+- **Build Safety**:
+  - *Problem*: Pushed code with a compile error (unused variable) which broke the CI/CD pipeline for v1.1.34.
+  - *Solution*: Created `setup_hooks.sh` to install a git pre-commit hook that runs `go build` automatically.
+  - *Lesson*: **ALWAYS build locally before pushing.** Run `./setup_hooks.sh` in new environments to prevent regression.
 
 ## Git & Release Workflow
 **CRITICAL**: ALWAYS autonomously commit code changes, push to git remote, AND tag them with the current version. Users rely on git tags to receive updates.
@@ -43,3 +48,4 @@
 - **v1.1.32 (2025-05-15)**: Fixed self-update mechanism to support in-place updates. ADDED CRITICAL FALLBACK: If `install.sh` fails, `autoUpdate` now attempts `go install` to ensure legacy clients can still update.
 - **v1.1.33 (2025-05-15)**: REMOVED "legacy cleanup" logic. It was deleting the binary after in-place updates via `go install`. Lesson: Do not assume `go install` is "legacy" or that users want to switch to the binary channel. Support both equally.
 - **v1.1.34 (2025-05-15)**: Fixed GitHub Actions release workflow. Upgraded `softprops/action-gh-release` to v2 and used glob patterns to reliably find and upload binary assets.
+- **v1.1.35 (2025-05-15)**: Fixed compile error (unused variable) in `autoUpdate` fallback logic. Added `setup_hooks.sh` to prevent future build breakages.
