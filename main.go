@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.20"
+	Version        = "v1.1.21"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -919,6 +919,7 @@ When using 'apply_udiff', provide a unified diff.
 - Use ' ' for context, '-' for removal, '+' for addition.
 - **ALWAYS** include at least 2 lines of context around your changes.
 - **Context is MANDATORY**: When inserting code, you must include existing lines around the insertion point. A hunk with only '+' lines is invalid (unless creating a new file).
+- **COMMON ISSUE**: The most frequent cause of failure is insufficient or mismatched context. Provide ample, unique context lines (more than 2 if needed) to ensure the patch applies correctly.
 - Do not include line numbers in the hunk header.
 - Ensure enough context is provided to uniquely locate the code.
 - Replace entire blocks/functions rather than small internal edits to ensure uniqueness.
