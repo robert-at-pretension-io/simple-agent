@@ -56,8 +56,12 @@ skills/web-browser/scripts/browse.py <url> [--no-js]
 Capture a screenshot of a webpage.
 
 ```bash
-skills/web-browser/scripts/screenshot.py <url> <output_path> [--full-page]
+skills/web-browser/scripts/screenshot.py <url> <output_path> [--no-full-page]
 ```
+
+- `<url>`: The URL to capture.
+- `<output_path>`: File path to save the screenshot (e.g., `page.png`).
+- `--no-full-page`: (Optional) Capture only the visible viewport (window) instead of the full page. Full page is enabled by default.
 
 ## Examples
 
@@ -81,7 +85,12 @@ skills/web-browser/scripts/browse.py "https://example.com/spa-app"
 skills/web-browser/scripts/browse.py "https://example.com/static" --no-js
 ```
 
-**Take a screenshot:**
+**Take a full-page screenshot (default):**
 ```bash
 skills/web-browser/scripts/screenshot.py "https://google.com" google.png
+```
+
+**Take a viewport screenshot (window only):**
+```bash
+skills/web-browser/scripts/screenshot.py "https://google.com" google_window.png --no-full-page
 ```

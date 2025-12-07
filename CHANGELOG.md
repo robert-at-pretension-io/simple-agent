@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.42]
+
+### Changed
+- **Web Browser**: `screenshot.py` now captures the full page by default. Added `--no-full-page` flag to capture only the visible viewport.
+
 ## [v1.1.41]
 
 ### Changed

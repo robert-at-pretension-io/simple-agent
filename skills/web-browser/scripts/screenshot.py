@@ -11,7 +11,7 @@ if os.path.exists(venv_python) and sys.executable != venv_python:
 
 import requests
 
-def take_screenshot(url, output_path, full_page=False):
+def take_screenshot(url, output_path, full_page=True):
     api_key = os.environ.get("SCRAPINGBEE_API_KEY")
     if not api_key:
         print("Error: SCRAPINGBEE_API_KEY environment variable not set.")
@@ -66,11 +66,11 @@ def take_screenshot(url, output_path, full_page=False):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print("Usage: screenshot.py <url> <output_path> [--full-page]")
+        print("Usage: screenshot.py <url> <output_path> [--no-full-page]")
         sys.exit(1)
     
     target_url = sys.argv[1]
     output_file = sys.argv[2]
-    full_page_flag = "--full-page" in sys.argv
+    full_page_flag = "--no-full-page" not in sys.argv
     
     take_screenshot(target_url, output_file, full_page=full_page_flag)
