@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.26"
+	Version        = "v1.1.27"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"

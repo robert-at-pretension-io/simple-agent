@@ -35,3 +35,4 @@
 - **v1.1.24 (2025-12-07)**: Updated system prompt to explicitly enforce `remember.txt` usage and persistence.
 - **v1.1.25 (2025-05-15)**: Added safety mechanism to save large tool outputs to disk instead of flooding context.
 - **v1.1.26 (2025-05-15)**: Removed redundant 'git-wizard' skill (replaced by 'yolo-runner' + shell access).
+- **v1.1.27 (2025-05-15)**: Added CI/CD pipeline (.github/workflows/release.yml) and install.sh script for automated binary distribution.
