@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.13"
+	Version        = "v1.1.14"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -899,6 +899,7 @@ When using 'apply_udiff', provide a unified diff.
 - If a file does not exist, treat it as empty for the 'before' state.
 - **CLI PREFERENCE**: You are encouraged to use the CLI for efficiency and exploration.
 - Use 'ls -R', 'grep', or 'find' to explore the file structure and search for patterns.
+- **GATHER CONTEXT**: When using 'grep' to find code to edit, ALWAYS use context flags (e.g., 'grep -C 5'). You need ample unique context lines to ensure 'apply_udiff' can locate the target code unambiguously.
 - Use 'cat', 'head', or 'tail' to quickly inspect file contents.
 - Run standard tools (git, go, npm, etc.) directly when needed.
 - Prefer shell commands for operations that are concise and standard.
