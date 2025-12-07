@@ -61,3 +61,5 @@
 - Updated 'web-browser' skill: 'browse.py' now enables JavaScript rendering by default. Added '--no-js' flag to disable it.
 - Released v1.1.41: Web Browser now defaults to JS rendering.
 - Updated 'web-browser' skill: 'screenshot.py' now captures full page by default. Added '--no-full-page' flag to capture window only.
+- Released v1.1.42: Web Browser screenshots now default to full-page.
+- Updated 'vision' skill: Added '--image-model' argument to 'analyze.py' for custom model selection.

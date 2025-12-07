@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.43]
+
+### Added
+- **Vision**: Added `--image-model` argument to `analyze.py` to allow custom model selection (e.g., `gemini-3-pro-preview`).
+
 ## [v1.1.42]
 
 ### Changed
