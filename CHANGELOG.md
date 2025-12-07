@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.36]
+
+### Chore
+- **CI/CD**: Disabled dependency caching in GitHub Actions. Since the agent uses only the Go standard library (no external deps), `go.sum` is not generated, causing false positive warnings in the build logs.
+
 ## [v1.1.35]
 
 ### Fixed
