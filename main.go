@@ -32,7 +32,7 @@ var installScript []byte
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.36"
+	Version        = "v1.1.37"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1476,8 +1476,41 @@ func startSpinner(stopChan chan struct{}, doneChan chan struct{}) {
 	}
 }
 
+func getLatestVersion() (string, error) {
+	resp, err := http.Get("https://api.github.com/repos/robert-at-pretension-io/simple-agent/releases/latest")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API status: %s", resp.Status)
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", err
+	}
+	return release.TagName, nil
+}
+
 func autoUpdate() {
 	fmt.Println("Checking for updates...")
+
+	latest, err := getLatestVersion()
+	if err != nil {
+		fmt.Printf("⚠️  Could not check for updates: %v\n", err)
+		return
+	}
+
+	if latest == Version {
+		fmt.Println("✅ You are using the latest version.")
+		return
+	}
+
+	fmt.Printf("⬇️  New version available: %s (Current: %s)\n", latest, Version)
 
 	// Get current executable info to check for changes
 	exe, err := os.Executable()

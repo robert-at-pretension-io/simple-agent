@@ -2,7 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.36
+- **Current Version**: v1.1.37
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -50,3 +50,4 @@
 - **v1.1.34 (2025-05-15)**: Fixed GitHub Actions release workflow. Upgraded `softprops/action-gh-release` to v2 and used glob patterns to reliably find and upload binary assets.
 - **v1.1.35 (2025-05-15)**: Fixed compile error (unused variable) in `autoUpdate` fallback logic. Added `setup_hooks.sh` to prevent future build breakages.
 - **v1.1.36 (2025-05-15)**: Disabled Go cache in CI. Project has no external dependencies (`go.sum` doesn't exist), so `setup-go` cache warnings were noise.
+- **v1.1.37 (2025-05-15)**: Fixed infinite update loop. Added `getLatestVersion` to check GitHub API before attempting update. Prevents 404s when already on latest.

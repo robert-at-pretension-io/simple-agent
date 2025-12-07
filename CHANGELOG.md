@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.37]
+
+### Fixed
+- **Auto-Update**: Implemented a version check before attempting an update. The agent now queries GitHub APIs to see if a new version exists. If the current version matches the latest, the update process is skipped. This prevents infinite update loops and eliminates 404 errors when release assets are missing for the *current* version.
+
 ## [v1.1.36]
 
 ### Chore
