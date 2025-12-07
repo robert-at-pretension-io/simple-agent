@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.16"
+	Version        = "v1.1.17"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -901,9 +901,9 @@ When using 'apply_udiff', provide a unified diff.
 - Prefer shell commands for operations that are concise and standard.
 - **CONTEXT MANAGEMENT**: Use 'shorten_context' to keep the session focused and save tokens.
 - **When to Reset**: 
-    - After completing a distinct task or sub-task.
+    - ONLY after completing a distinct task or sub-task.
     - Before starting a new, unrelated activity.
-    - When the conversation history becomes cluttered with obsolete details (e.g., long diffs or logs).
+    - **AVOID** resetting if the user is building context (e.g., exploring files, reading docs) for an upcoming task. Wait for a definitive stopping point.
 - **Goal**: Maintain a clean, concise state with only vital information for the next steps.
 `
 	systemPrompt := baseSystemPrompt + getSkillsExplanation() + skillsPrompt
