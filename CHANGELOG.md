@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.12] - 2025-12-07
+
+### Refactor
+- **Core Toolset**:
+    - Removed `read_file` and `list_files` native tools in favor of `yolo-runner` (shell access) to simplify the agent's capabilities.
+    - Updated System Prompt to explicitly encourage using `yolo-runner` for file system operations.
+    - Updated `run_script` tool description to emphasize its role as the primary OS interface.
+
 ## [v1.1.11] - 2025-12-06
 
 ### Maintenance
