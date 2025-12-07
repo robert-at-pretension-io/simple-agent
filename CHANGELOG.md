@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.38]
+
+### Fixed
+- **CI/CD**: Refactored the GitHub Actions release workflow to eliminate a race condition ("Too many retries" error). The workflow now builds binaries in parallel jobs, collects them, and then creates the release in a single, atomic final step.
+
 ## [v1.1.37]
 
 ### Fixed
