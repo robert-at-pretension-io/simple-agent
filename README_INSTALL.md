@@ -22,7 +22,7 @@ curl -sL https://raw.githubusercontent.com/robert-at-pretension-io/simple-agent/
 You can install `simple-agent` directly from the source using the `go install` command:
 
 ```bash
-go install github.com/robert-at-pretension-io/simple-agent@latest
+GOPROXY=direct go install github.com/robert-at-pretension-io/simple-agent@latest
 ```
 
 Ensure that your Go bin directory (usually `$HOME/go/bin`) is in your system's `PATH`.
