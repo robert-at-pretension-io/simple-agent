@@ -14,14 +14,16 @@ The knowledge base is stored in a file named **`remember.txt`** in the root of t
 
 ## How to Use
 
-### 1. Reading Memory
-To recall information, read the content of the memory file:
-- Run: `run_script skills/remember/scripts/read.sh`
-- Or simply: `cat remember.txt`
+### 1. Initialization
+If `remember.txt` does not exist, create it using standard tools:
+- `echo "# Project Memory" > remember.txt`
 
-### 2. Curating Memory (IMPORTANT)
-To add, update, or remove information, **you MUST use the `apply_udiff` tool**.
-- **Do not** simply append text blindly.
+### 2. Reading Memory
+To recall information, simply read the file:
+- `cat remember.txt`
+
+### 3. Curating Memory (IMPORTANT)
+To add, update, or remove information, **use the `apply_udiff` tool** or standard text processing.
 - **Curate** the content: Organize facts into sections, update outdated info, and keep it concise.
 - **The Edit Tool**: You have the `apply_udiff` tool available. Use it to surgically edit `remember.txt`.
 
