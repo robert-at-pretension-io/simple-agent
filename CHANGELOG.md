@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.24] - 2025-12-07
+
+### Improved
+- **System Prompt**: Added a dedicated "**PROJECT MEMORY**" section to the system prompt, explicitly instructing the AI to prioritize reading and updating `remember.txt` using the `remember` skill.
+
 ## [v1.1.23] - 2025-12-07
 
 ### Improved

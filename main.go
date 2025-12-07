@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.23"
+	Version        = "v1.1.24"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -963,6 +963,11 @@ When using 'apply_udiff', provide a unified diff.
     - Before starting a new, unrelated activity.
     - **AVOID** resetting if the user is building context (e.g., exploring files, reading docs) for an upcoming task. Wait for a definitive stopping point.
 - **Goal**: Maintain a clean, concise state with only vital information for the next steps.
+- **PROJECT MEMORY**:
+    - **remember.txt**: This file is your long-term memory. It contains architectural decisions, current status, and lessons learned.
+    - **Read First**: Always read 'remember.txt' when starting a task to ground yourself in the project context.
+    - **Update Always**: Actively maintain this file. If you make a decision or learn something, add it to 'remember.txt' immediately.
+    - **Use the Skill**: Use the 'remember' skill tools (or standard file tools) to curate this file.
 `
 	systemPrompt := baseSystemPrompt + getSkillsExplanation() + skillsPrompt
 
