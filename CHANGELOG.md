@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.25] - 2025-12-07
+
+### Improved
+- **UX**: Updated the welcome message to explicitly mention `/help` and `/clear` commands, improving feature discoverability for new users.
+
+### Fixed
+- **Stability**: Implemented safety check for `run_script` outputs. Outputs larger than 50,000 characters are now automatically diverted to a file in `.simple_agent/outputs/` to prevent API token limit errors and context overflow.
+
 ## [v1.1.24] - 2025-12-07
 
 ### Improved

@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.24"
+	Version        = "v1.1.25"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1000,7 +1000,7 @@ When using 'apply_udiff', provide a unified diff.
 	if len(skills) > 0 {
 		fmt.Printf("Loaded %d skills from ./skills\n", len(skills))
 	}
-	fmt.Println("Type your message. Press Ctrl+D (or Ctrl+Z on Windows) on a new line to send. Ctrl+C to interrupt/exit.")
+	fmt.Println("Type your message. Press Ctrl+D (or Ctrl+Z on Windows) on a new line to send. Type /help for commands (e.g. /clear). Ctrl+C to interrupt/exit.")
 
 	client := &http.Client{}
 
@@ -1727,7 +1727,22 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
-	// Output is not truncated. The agent must manage its own context usage.
+	// Output size check to prevent context overflow
+	const MaxOutputChars = 50000 // ~12.5k tokens
+	if len(output) > MaxOutputChars {
+		home, homeErr := os.UserHomeDir()
+		if homeErr == nil {
+			outputDir := filepath.Join(home, ".simple_agent", "outputs")
+			_ = os.MkdirAll(outputDir, 0755)
+			
+			filename := fmt.Sprintf("output_%d.txt", time.Now().UnixNano())
+			filePath := filepath.Join(outputDir, filename)
+			
+			if writeErr := os.WriteFile(filePath, out, 0644); writeErr == nil {
+				output = fmt.Sprintf("Output too large (%d chars). Saved to %s\nRead this file to see the results.", len(output), filePath)
+			}
+		}
+	}
 
 	if err != nil {
 		return output, fmt.Errorf("script execution failed: %w\nOutput:\n%s", err, output)

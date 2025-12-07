@@ -2,7 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.24
+- **Current Version**: v1.1.25
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -16,13 +16,21 @@
   - *Solution*: Added a dedicated "**PROJECT MEMORY**" section to the system prompt in `main.go`.
   - *Lesson*: Instructions to "remember" must be proactive and unconditional in the system prompt, not just hidden in tool descriptions.
 
-## Release Workflow
-When releasing a major feature or fix:
+- **Large Output Handling**:
+  - *Problem*: Tools (like `grep` or `cat`) sometimes produce massive output (>100k tokens), causing API errors (Status 400) and crashing the agent's context.
+  - *Solution*: Modified `runSafeScript` in `main.go` to check output length. Outputs > 50,000 characters are now automatically saved to a file in `.simple_agent/outputs/`, and the agent receives a pointer to that file instead of the raw data.
+  - *Lesson*: Always bound tool outputs. The LLM context window is finite; file-based offloading is a robust fallback for "firehose" data.
+
+## Git & Release Workflow
+**CRITICAL**: ALWAYS autonomously commit code changes, push to git remote, AND tag them with the current version. Users rely on git tags to receive updates.
+
+1.  **Commit**: Stage and commit all changes with a descriptive message.
 1.  Bump `Version` constant in `main.go`.
 2.  Update `CHANGELOG.md` with a new version header and notes.
-3.  Create a git tag matching the version (e.g., `git tag v1.1.23`).
-4.  Push changes and tags: `git push origin main --tags`.
+3.  **Tag**: Create a git tag matching the current version (e.g., `git tag v1.1.25`).
+4.  **Push**: Push changes and tags immediately: `git push origin main --tags`.
 
 ## Recent History
 - **v1.1.23 (2025-12-07)**: Updated system prompt to improve `apply_udiff` reliability by enforcing context rules.
 - **v1.1.24 (2025-12-07)**: Updated system prompt to explicitly enforce `remember.txt` usage and persistence.
+- **v1.1.25 (2025-05-15)**: Added safety mechanism to save large tool outputs to disk instead of flooding context.
