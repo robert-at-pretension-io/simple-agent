@@ -2,7 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.28
+- **Current Version**: v1.1.29
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -37,3 +37,4 @@
 - **v1.1.26 (2025-05-15)**: Removed redundant 'git-wizard' skill (replaced by 'yolo-runner' + shell access).
 - **v1.1.27 (2025-05-15)**: Added CI/CD pipeline (.github/workflows/release.yml) and install.sh script for automated binary distribution.
 - **v1.1.28 (2025-05-15)**: Embedded `install.sh` into the binary. `autoUpdate` now uses this script to migrate users from `go install` to the binary release channel.
+- **v1.1.29 (2025-05-15)**: Added cleanup logic to remove the legacy `go install` binary after successful migration.
