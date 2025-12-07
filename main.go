@@ -137,6 +137,10 @@ var runScriptTool = Tool{
 			"items": {
 				"type": "string"
 			},
+			"no_truncate": {
+				"type": "boolean",
+				"description": "If true, the output will not be truncated. Use ONLY if you need the full output (e.g., reading a large file or log) and are prepared for high token usage."
+			},
 			"description": "Arguments to pass to the script"
 		}
 	},
@@ -452,7 +456,7 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 			fmt.Printf("[Hook: %s] Running for skill '%s': %s %v\n", event, skill.Name, scriptPath, args)
 
 			// Use runSafeScript to enforce security and execution logic
-			out, err := runSafeScript(ctx, scriptPath, args, "")
+			out, err := runSafeScript(ctx, scriptPath, args, false, "")
 			if err != nil {
 				fmt.Printf("[Hook Error] %v\n", err)
 				output.WriteString(fmt.Sprintf("Hook '%s' (skill: %s) failed: %v\n", event, skill.Name, err))
@@ -898,6 +902,12 @@ When using 'apply_udiff', provide a unified diff.
 - Use 'cat', 'head', or 'tail' to quickly inspect file contents.
 - Run standard tools (git, go, npm, etc.) directly when needed.
 - Prefer shell commands for operations that are concise and standard.
+- **CONTEXT MANAGEMENT**: Use 'shorten_context' to keep the session focused and save tokens.
+- **When to Reset**: 
+    - After completing a distinct task or sub-task.
+    - Before starting a new, unrelated activity.
+    - When the conversation history becomes cluttered with obsolete details (e.g., long diffs or logs).
+- **Goal**: Maintain a clean, concise state with only vital information for the next steps.
 `
 	systemPrompt := baseSystemPrompt + getSkillsExplanation() + skillsPrompt
 
@@ -1192,6 +1202,7 @@ When using 'apply_udiff', provide a unified diff.
 						var args struct {
 							Path string   `json:"path"`
 							Args []string `json:"args"`
+							NoTruncate bool `json:"no_truncate"`
 						}
 						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
@@ -1199,8 +1210,8 @@ When using 'apply_udiff', provide a unified diff.
 							// Pre-run hook
 							runSkillHooks(ctx, skills, "pre_run", map[string]string{"path": args.Path, "args": strings.Join(args.Args, " ")})
 
-							fmt.Printf("Executing script: %s %v\n", args.Path, args.Args)
-							toolResult, toolErr = runSafeScript(ctx, args.Path, args.Args, skillsPrompt)
+							fmt.Printf("Executing script: %s %v (no_truncate=%v)\n", args.Path, args.Args, args.NoTruncate)
+							toolResult, toolErr = runSafeScript(ctx, args.Path, args.Args, args.NoTruncate, skillsPrompt)
 
 							// Post-run hook
 							hookOut := runSkillHooks(ctx, skills, "post_run", map[string]string{"path": args.Path, "args": strings.Join(args.Args, " ")})
@@ -1589,7 +1600,7 @@ func parseArgs(command string) ([]string, error) {
 	return args, nil
 }
 
-func runSafeScript(ctx context.Context, scriptPath string, args []string, skillsPrompt string) (string, error) {
+func runSafeScript(ctx context.Context, scriptPath string, args []string, noTruncate bool, skillsPrompt string) (string, error) {
 	// Validate path
 	absPath, err := validatePath(scriptPath)
 	if err != nil {
@@ -1647,11 +1658,16 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 	output := string(out)
 
 	// Truncate output to prevent context window overflow
-	// 40000 chars is roughly 10k tokens, which is safe for most models while providing enough context
-	const maxOutputLen = 40000
+	// Default limit is 10k chars (approx 2.5k tokens).
+	// If noTruncate is true, we allow up to 1MB (approx 250k tokens) which acts as a sanity limit.
+	maxOutputLen := 10000
+	if noTruncate {
+		maxOutputLen = 1000000 // 1MB
+	}
+
 	if len(output) > maxOutputLen {
 		truncated := len(output) - maxOutputLen
-		output = output[:maxOutputLen] + fmt.Sprintf("\n... [Output truncated. %d chars omitted] ...", truncated)
+		output = output[:maxOutputLen] + fmt.Sprintf("\n... [Output truncated. %d chars omitted] ...\n(To see the full output, run the command again with \"no_truncate\": true, but be mindful of token usage.)", truncated)
 	}
 
 	if err != nil {
