@@ -11,6 +11,7 @@ This skill provides capabilities to search the web using Brave Search and browse
 
 1.  **Search**: Query the web for information.
 2.  **Browse**: Visit a specific URL and extract its main text content.
+3.  **Screenshot**: Capture a visual screenshot of a web page.
 
 ## Prerequisites
 
@@ -50,6 +51,14 @@ skills/web-browser/scripts/browse.py <url> [--js]
 - `<url>`: The URL to visit.
 - `--js`: (Optional) Enable JavaScript rendering (uses more credits/time, but helpful for dynamic sites).
 
+### 3. Screenshot
+
+Capture a screenshot of a webpage.
+
+```bash
+skills/web-browser/scripts/screenshot.py <url> <output_path> [--full-page]
+```
+
 ## Examples
 
 **Search for a topic:**
@@ -65,4 +74,9 @@ skills/web-browser/scripts/browse.py "https://redwoodjs.com/docs/introduction"
 **Read a Single Page Application (SPA):**
 ```bash
 skills/web-browser/scripts/browse.py "https://example.com/spa-app" --js
+```
+
+**Take a screenshot:**
+```bash
+skills/web-browser/scripts/screenshot.py "https://google.com" google.png
 ```

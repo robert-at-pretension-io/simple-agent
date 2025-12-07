@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.40]
+
+### Added
+- **Web Browser**: Added `screenshot` capability using ScrapingBee (`skills/web-browser/scripts/screenshot.py`).
+- **Vision**: Added `--output` argument to `analyze.py` to save analysis to a file (defaults to random filename).
+- **Vision**: `analyze.py` now prints image metadata (size, dimensions, format).
+
+## [v1.1.39]
+
+### Changed
+- **Vision**: Switched model from `gemini-2.0-flash` to `gemini-2.5-flash` via OpenAI compatibility layer.
+
 ## [v1.1.38]
 
 ### Fixed

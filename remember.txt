@@ -53,3 +53,7 @@
 - **v1.1.37 (2025-05-15)**: Fixed infinite update loop. Added `getLatestVersion` to check GitHub API before attempting update. Prevents 404s when already on latest.
 - **v1.1.38 (2025-05-15)**: Fixed GitHub Actions race condition ("Too many retries"). Refactored workflow to separate parallel builds from atomic release creation using `upload-artifact`/`download-artifact`.
 - **v1.1.39 (2025-05-15)**: Fixed auto-update regression. Replaced naive version equality check with semantic version comparison to prevent accidental downgrades.
+- Switched vision skill model to 'gemini-2.5-flash' as requested.
+- Added 'screenshot' capability to 'web-browser' skill using ScrapingBee API.
+- Refactored 'vision' skill: 'analyze.py' now saves output to file by default and prints image metadata (size, dims) to stdout. Added Pillow dependency.
+- Updated 'vision' skill: 'analyze.py' now generates a unique random filename for output if not specified.
