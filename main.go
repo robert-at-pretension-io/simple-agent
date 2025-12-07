@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.19"
+	Version        = "v1.1.20"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -911,7 +911,7 @@ func main() {
 	}()
 
 	// Run startup hooks (using background context as this is init)
-	runSkillHooks(context.Background(), skills, "startup", nil)
+	startupOutput := runSkillHooks(context.Background(), skills, "startup", nil)
 
 	baseSystemPrompt := `You have access to tools to edit files and execute scripts (providing full shell access).
 When using 'apply_udiff', provide a unified diff.
@@ -943,6 +943,10 @@ When using 'apply_udiff', provide a unified diff.
 			Role:    "system",
 			Content: systemPrompt,
 		},
+	}
+
+	if startupOutput != "" {
+		messages = append(messages, Message{Role: "system", Content: "Startup Instructions:\n" + startupOutput})
 	}
 
 	// Load history

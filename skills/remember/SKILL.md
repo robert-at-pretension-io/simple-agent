@@ -2,7 +2,7 @@
 name: remember
 description: Manage a project-specific knowledge base (remember.txt) to persist context, decisions, and lessons learned across sessions.
 hooks:
-  startup: scripts/init.sh
+  startup: inject_skill_md
 ---
 
 # Remember Skill
