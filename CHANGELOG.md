@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.32]
+
+### Fixed
+- **Update Logic**: Added a fallback mechanism to `autoUpdate`. If the binary update via `install.sh` fails, the agent now attempts to update using `go install` (legacy method). This ensures compatibility for users migrating from older versions or those on unsupported architectures.
+- **Self-Update**: Fixed the `install.sh` invocation to correctly pass the current executable path, allowing for in-place updates of the running binary.
+
+## [v1.1.31]
+
+### Improved
+- **UX**: The Welcome message (REPL banner) now explicitly includes the Agent Version and Model Name. This ensures the version is visible even if the initial log output scrolls off the screen.
+
 ## [v1.1.30]
 
 ### Added

@@ -2,7 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.30
+- **Current Version**: v1.1.32 (with legacy fallback)
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -39,3 +39,5 @@
 - **v1.1.28 (2025-05-15)**: Embedded `install.sh` into the binary. `autoUpdate` now uses this script to migrate users from `go install` to the binary release channel.
 - **v1.1.29 (2025-05-15)**: Added cleanup logic to remove the legacy `go install` binary after successful migration.
 - **v1.1.30 (2025-05-15)**: Added unconditional version printing on startup to improve UX and troubleshooting.
+- **v1.1.31 (2025-05-15)**: Enhanced UX by adding Version and Model Name to the interactive Welcome message, ensuring visibility.
+- **v1.1.32 (2025-05-15)**: Fixed self-update mechanism to support in-place updates. ADDED CRITICAL FALLBACK: If `install.sh` fails, `autoUpdate` now attempts `go install` to ensure legacy clients can still update.

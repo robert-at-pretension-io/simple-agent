@@ -32,7 +32,7 @@ var installScript []byte
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.30"
+	Version        = "v1.1.32"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1001,7 +1001,7 @@ When using 'apply_udiff', provide a unified diff.
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("Welcome to Gemini REPL (%s)\n", ModelName)
+	fmt.Printf("Welcome to Simple Agent %s (Model: %s)\n", Version, ModelName)
 	if len(skills) > 0 {
 		fmt.Printf("Loaded %d skills from ./skills\n", len(skills))
 	}
@@ -1507,16 +1507,26 @@ func autoUpdate() {
 	tmpFile.Close()
 	os.Chmod(tmpFile.Name(), 0755)
 
-	// Execute install script (no args = fetch latest)
-	cmd = exec.Command("/bin/sh", tmpFile.Name())
+	// Execute install script (arg1=version(empty=latest), arg2=target)
+	cmd = exec.Command("/bin/sh", tmpFile.Name(), "", exe)
 
 	// Execute and capture output
 	if out, err := cmd.CombinedOutput(); err != nil {
-		fmt.Printf("⚠️  Update failed: %v\n", err)
+		fmt.Printf("⚠️  Binary update failed: %v\n", err)
 		if len(out) > 0 {
 			fmt.Printf("Output:\n%s\n", out)
 		}
-		return
+
+		// Fallback: Try 'go install' for backward compatibility
+		fmt.Println("🔄 Attempting fallback to 'go install'...")
+		cmd = exec.Command("go", "install", "github.com/robert-at-pretension-io/simple-agent@latest")
+		cmd.Env = append(os.Environ(), "GOPROXY=direct")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Printf("⚠️  Fallback update failed: %v\n", err)
+			return
+		}
+		fmt.Println("✅ Fallback update complete via 'go install'. Please restart.")
+		os.Exit(0)
 	}
 
 	// Migration Cleanup: If running from 'go install' path, remove the old binary

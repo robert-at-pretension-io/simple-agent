@@ -58,6 +58,8 @@ DOWNLOAD_URL="${GITHUB_URL}/releases/download/${VERSION}/${BINARY_NAME}"
 
 # Download
 TMP_DIR=$(mktemp -d)
+
+TARGET_PATH="$2"
 DEST="${TMP_DIR}/${BINARY_NAME}"
 
 echo "Downloading from $DOWNLOAD_URL..."
@@ -77,26 +79,30 @@ fi
 # Install
 chmod +x "$DEST"
 
-INSTALL_DIR="/usr/local/bin"
-if [ ! -w "$INSTALL_DIR" ]; then
-    INSTALL_DIR="$HOME/.local/bin"
-    mkdir -p "$INSTALL_DIR"
-    echo "Warning: /usr/local/bin not writable. Installing to $INSTALL_DIR"
-    echo "Please ensure $INSTALL_DIR is in your PATH."
+if [ -n "$TARGET_PATH" ]; then
+    # If target path is a directory, append binary name
+    if [ -d "$TARGET_PATH" ]; then
+        INSTALL_DEST="$TARGET_PATH/simple-agent"
+    else
+        INSTALL_DEST="$TARGET_PATH"
+    fi
 else
-    # Need sudo if not writable, but we are just checking -w
-    # If we are root or have permissions, good. If not, fallback or ask for sudo?
-    # Simplicity: Fallback to local if system is not writable, or assume user handles sudo before running script.
-    # For this script, I'll try to move, and if it fails, suggest sudo.
-    :
+    INSTALL_DIR="/usr/local/bin"
+    if [ ! -w "$INSTALL_DIR" ]; then
+        INSTALL_DIR="$HOME/.local/bin"
+        mkdir -p "$INSTALL_DIR"
+        echo "Warning: /usr/local/bin not writable. Installing to $INSTALL_DIR"
+        echo "Please ensure $INSTALL_DIR is in your PATH."
+    fi
+    INSTALL_DEST="$INSTALL_DIR/simple-agent"
 fi
 
 # Try to move
-if mv "$DEST" "$INSTALL_DIR/simple-agent"; then
-    echo "Successfully installed to $INSTALL_DIR/simple-agent"
+if mv "$DEST" "$INSTALL_DEST"; then
+    echo "Successfully installed to $INSTALL_DEST"
     echo "Run 'simple-agent --help' to get started."
 else
-    echo "Error: Could not move binary to $INSTALL_DIR"
+    echo "Error: Could not move binary to $INSTALL_DEST"
     echo "Try running with sudo or check permissions."
     rm -rf "$TMP_DIR"
     exit 1
