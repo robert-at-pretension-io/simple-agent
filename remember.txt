@@ -2,8 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.27
-- **Status**: v1.1.27 tagged and pushed. GitHub Actions release workflow triggered.
+- **Current Version**: v1.1.28
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -37,3 +36,4 @@
 - **v1.1.25 (2025-05-15)**: Added safety mechanism to save large tool outputs to disk instead of flooding context.
 - **v1.1.26 (2025-05-15)**: Removed redundant 'git-wizard' skill (replaced by 'yolo-runner' + shell access).
 - **v1.1.27 (2025-05-15)**: Added CI/CD pipeline (.github/workflows/release.yml) and install.sh script for automated binary distribution.
+- **v1.1.28 (2025-05-15)**: Embedded `install.sh` into the binary. `autoUpdate` now uses this script to migrate users from `go install` to the binary release channel.
