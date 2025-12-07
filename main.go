@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.17"
+	Version        = "v1.1.18"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -414,6 +414,9 @@ func generateSkillsPrompt(skills []Skill) string {
 
 		if s.Name == "yolo-runner" {
 			sb.WriteString("\n  **AUTONOMY MODE**: You have the 'yolo-runner' skill. Use it to run ANY shell command needed to complete your task. You are authorized to take initiative.\n")
+		}
+		if s.Name == "remember" {
+			sb.WriteString("\n  **PROJECT MEMORY**: Use the 'remember' skill to persist important facts, decisions, and context. Read 'remember.txt' at the start of tasks and update it as you learn.\n")
 		}
 	}
 	return sb.String()
