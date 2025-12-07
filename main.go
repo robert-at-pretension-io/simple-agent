@@ -29,7 +29,7 @@ var embeddedSkillsFS embed.FS
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.18"
+	Version        = "v1.1.19"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -426,6 +426,17 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 	var output strings.Builder
 	for _, skill := range skills {
 		if cmdTemplate, ok := skill.Hooks[event]; ok {
+			// Special hook type: inject_skill_md
+			if cmdTemplate == "inject_skill_md" {
+				body, err := readSkillBody(skill.DefinitionFile)
+				if err != nil {
+					fmt.Printf("[Hook Error] Failed to read skill body for '%s': %v\n", skill.Name, err)
+					continue
+				}
+				output.WriteString(fmt.Sprintf("\n[Skill: %s Instructions]\n%s\n", skill.Name, body))
+				continue
+			}
+
 			// Prepare command
 			cmdStr := cmdTemplate
 			// Replace {skill_path}
@@ -465,6 +476,22 @@ func runSkillHooks(ctx context.Context, skills []Skill, event string, context ma
 		}
 	}
 	return output.String()
+}
+
+func readSkillBody(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	s := string(data)
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	if strings.HasPrefix(s, "---") {
+		parts := strings.SplitN(s, "---", 3)
+		if len(parts) >= 3 {
+			return strings.TrimSpace(parts[2]), nil
+		}
+	}
+	return s, nil
 }
 
 // restoreTerminal restores the terminal to canonical mode and echo.
@@ -1175,9 +1202,12 @@ When using 'apply_udiff', provide a unified diff.
 
 									if strings.ToLower(confirm) == "y" {
 										// Pre-edit hook
-										runSkillHooks(ctx, skills, "pre_edit", map[string]string{"path": args.Path})
+										preHookOut := runSkillHooks(ctx, skills, "pre_edit", map[string]string{"path": args.Path})
 
 										toolResult, toolErr = applyUDiff(ctx, args.Path, args.Diff, false)
+										if preHookOut != "" {
+											toolResult = "[Pre-Edit Hook Output]\n" + preHookOut + "\n\n" + toolResult
+										}
 										if toolErr == nil {
 											fmt.Printf("Successfully applied diff to %s\n", args.Path)
 											toolResult = "Diff applied successfully."
@@ -1207,10 +1237,13 @@ When using 'apply_udiff', provide a unified diff.
 							toolErr = fmt.Errorf("error parsing arguments: %v", err)
 						} else {
 							// Pre-run hook
-							runSkillHooks(ctx, skills, "pre_run", map[string]string{"path": args.Path, "args": strings.Join(args.Args, " ")})
+							preHookOut := runSkillHooks(ctx, skills, "pre_run", map[string]string{"path": args.Path, "args": strings.Join(args.Args, " ")})
 
 							fmt.Printf("Executing script: %s %v\n", args.Path, args.Args)
 							toolResult, toolErr = runSafeScript(ctx, args.Path, args.Args, skillsPrompt)
+							if preHookOut != "" {
+								toolResult = "[Pre-Run Hook Output]\n" + preHookOut + "\n\n" + toolResult
+							}
 
 							// Post-run hook
 							hookOut := runSkillHooks(ctx, skills, "post_run", map[string]string{"path": args.Path, "args": strings.Join(args.Args, " ")})
