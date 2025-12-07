@@ -120,37 +120,11 @@ var udiffTool = Tool{
 	},
 }
 
-var readFileTool = Tool{
-	Type: "function",
-	Function: FunctionDefinition{
-		Name:        "read_file",
-		Description: "Read the contents of a file.",
-		Parameters: json.RawMessage(`{
-			"type": "object",
-			"properties": {
-				"path": {
-					"type": "string",
-					"description": "The path to the file to read"
-				},
-				"start_line": {
-					"type": "integer",
-					"description": "The line number to start reading from (1-based, optional)"
-				},
-				"end_line": {
-					"type": "integer",
-					"description": "The line number to stop reading at (1-based, inclusive, optional)"
-				}
-			},
-			"required": ["path"]
-		}`),
-	},
-}
-
 var runScriptTool = Tool{
 	Type: "function",
 	Function: FunctionDefinition{
 		Name:        "run_script",
-		Description: "Execute a shell script (.sh) from a skill. IMPORTANT: The script MUST be located explicitly within a 'skills/<skill_name>/scripts/' directory.",
+		Description: "Execute a shell script (.sh) from a skill. This is the PRIMARY way to execute code and interact with the OS. You use this to run the 'yolo-runner' skill for arbitrary shell commands, or other specialized skill scripts.",
 		Parameters: json.RawMessage(`{
 	"type": "object",
 	"properties": {
@@ -167,23 +141,6 @@ var runScriptTool = Tool{
 		}
 	},
 	"required": ["path"]
-		}`),
-	},
-}
-
-var listFilesTool = Tool{
-	Type: "function",
-	Function: FunctionDefinition{
-		Name:        "list_files",
-		Description: "List files and directories at a given path.",
-		Parameters: json.RawMessage(`{
-			"type": "object",
-			"properties": {
-				"path": {
-					"type": "string",
-					"description": "The directory path to list (default: .)"
-				}
-			}
 		}`),
 	},
 }
@@ -254,7 +211,6 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
       - ` + "`pre_edit` / `post_edit`" + `: Runs before/after ` + "`apply_udiff`" + `. **Great for running linters/tests automatically.**
       - ` + "`pre_run` / `post_run`" + `: Runs before/after ` + "`run_script`" + `.
       - ` + "`pre_commit`" + `: Runs before the agent proposes a git commit.
-      - ` + "`pre_view` / `post_view`" + `: Runs before/after ` + "`read_file`" + `.
       **Example**:
       hooks:
         post_edit: scripts/lint.sh
@@ -266,7 +222,7 @@ A skill is a directory (e.g., ` + "`skills/my-skill/`" + `) containing:
 
 ## How to Invoke Skills
 1.  **Discover**: The system provides a list of available skills.
-2.  **Learn**: If a user request matches a skill, use 'read_file' to read its 'SKILL.md'.
+2.  **Learn**: If a user request matches a skill, read its 'SKILL.md' (e.g. using 'yolo-runner').
 3.  **Execute**: Follow the instructions in 'SKILL.md'.
     - If the instructions refer to scripts, execute them using 'run_script'.
     - Scripts are typically located relative to the skill directory (e.g., ` + "`skills/my-skill/scripts/script.sh`" + `).
@@ -437,7 +393,7 @@ func generateSkillsPrompt(skills []Skill) string {
 	var sb strings.Builder
 	sb.WriteString("\n# Available Skills\n")
 	sb.WriteString("You can perform complex tasks by using the following skills.\n")
-	sb.WriteString("To use one, read the definition file first using 'read_file'.\n\n")
+	sb.WriteString("To use one, read the definition file first (e.g. using 'yolo-runner').\n\n")
 
 	for _, s := range skills {
 		sb.WriteString(fmt.Sprintf("- **%s**", s.Name))
@@ -927,7 +883,7 @@ func main() {
 	// Run startup hooks (using background context as this is init)
 	runSkillHooks(context.Background(), skills, "startup", nil)
 
-	baseSystemPrompt := `You have access to tools to edit files, read files, list files, search files, and execute scripts.
+	baseSystemPrompt := `You have access to tools to edit files and execute scripts (providing full shell access).
 When using 'apply_udiff', provide a unified diff.
 - Start hunks with '@@ ... @@'
 - Use ' ' for context, '-' for removal, '+' for addition.
@@ -1033,7 +989,7 @@ When using 'apply_udiff', provide a unified diff.
 			reqBody := ChatCompletionRequest{
 				Model:     ModelName,
 				Messages:  messages,
-				Tools:     []Tool{udiffTool, readFileTool, runScriptTool, listFilesTool, shortenContextTool},
+				Tools:     []Tool{udiffTool, runScriptTool, shortenContextTool},
 				ExtraBody: json.RawMessage(`{"google": {"thinking_config": {"include_thoughts": true}}}`),
 			}
 
@@ -1230,28 +1186,6 @@ When using 'apply_udiff', provide a unified diff.
 							}
 						}
 
-					case "read_file":
-						fmt.Printf("\n\033[1;35m🛠  Tool Call: read_file\033[0m\n")
-						var args struct {
-							Path      string `json:"path"`
-							StartLine int    `json:"start_line"`
-							EndLine   int    `json:"end_line"`
-						}
-						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-							toolErr = fmt.Errorf("error parsing arguments: %v", err)
-						} else {
-							// Pre-view hook
-							runSkillHooks(ctx, skills, "pre_view", map[string]string{"path": args.Path})
-
-							fmt.Printf("Reading file: %s (lines %d-%d)\n", args.Path, args.StartLine, args.EndLine)
-							toolResult, toolErr = readFile(ctx, args.Path, args.StartLine, args.EndLine)
-
-							// Post-view hook
-							hookOut := runSkillHooks(ctx, skills, "post_view", map[string]string{"path": args.Path})
-							if hookOut != "" {
-								toolResult += "\n\n[Hook Output]\n" + hookOut
-							}
-						}
 
 					case "run_script":
 						fmt.Printf("\n\033[1;35m🛠  Tool Call: run_script\033[0m\n")
@@ -1273,18 +1207,6 @@ When using 'apply_udiff', provide a unified diff.
 							if hookOut != "" {
 								toolResult += "\n\n[Hook Output]\n" + hookOut
 							}
-						}
-
-					case "list_files":
-						fmt.Printf("\n\033[1;35m🛠  Tool Call: list_files\033[0m\n")
-						var args struct {
-							Path string `json:"path"`
-						}
-						if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-							toolErr = fmt.Errorf("error parsing arguments: %v", err)
-						} else {
-							fmt.Printf("Listing files in: %s\n", args.Path)
-							toolResult, toolErr = listFiles(args.Path)
 						}
 
 
@@ -1614,36 +1536,6 @@ func validatePath(path string) (string, error) {
 	return absPath, nil
 }
 
-func readFile(ctx context.Context, path string, startLine, endLine int) (string, error) {
-	absPath, err := validatePath(path)
-	if err != nil {
-		return "", err
-	}
-
-	data, err := os.ReadFile(absPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
-	}
-	content := string(data)
-
-	if startLine == 0 && endLine == 0 {
-		return content, nil
-	}
-
-	lines := strings.Split(content, "\n")
-	if startLine < 1 {
-		startLine = 1
-	}
-	if endLine == 0 || endLine > len(lines) {
-		endLine = len(lines)
-	}
-
-	if startLine > endLine || startLine > len(lines) {
-		return "", fmt.Errorf("invalid line range: %d-%d (file has %d lines)", startLine, endLine, len(lines))
-	}
-
-	return strings.Join(lines[startLine-1:endLine], "\n"), nil
-}
 
 func parseArgs(command string) ([]string, error) {
 	var args []string
@@ -1766,31 +1658,6 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 		return output, fmt.Errorf("script execution failed: %w\nOutput:\n%s", err, output)
 	}
 	return output, nil
-}
-
-func listFiles(path string) (string, error) {
-	absPath, err := validatePath(path)
-	if err != nil {
-		return "", err
-	}
-
-	entries, err := os.ReadDir(absPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to list directory: %w", err)
-	}
-	var sb strings.Builder
-	for _, entry := range entries {
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-		suffix := ""
-		if entry.IsDir() {
-			suffix = "/"
-		}
-		sb.WriteString(fmt.Sprintf("%s%s (%d bytes)\n", entry.Name(), suffix, info.Size()))
-	}
-	return sb.String(), nil
 }
 
 
