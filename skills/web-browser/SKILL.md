@@ -45,11 +45,11 @@ skills/web-browser/scripts/search.py "query string"
 Visit a URL and extract text. Removes ads, scripts, and navigation to focus on content.
 
 ```bash
-skills/web-browser/scripts/browse.py <url> [--js]
+skills/web-browser/scripts/browse.py <url> [--no-js]
 ```
 
 - `<url>`: The URL to visit.
-- `--js`: (Optional) Enable JavaScript rendering (uses more credits/time, but helpful for dynamic sites).
+- `--no-js`: (Optional) Disable JavaScript rendering (faster, uses fewer credits). JS is enabled by default.
 
 ### 3. Screenshot
 
@@ -71,9 +71,14 @@ skills/web-browser/scripts/search.py "latest RedwoodJS features"
 skills/web-browser/scripts/browse.py "https://redwoodjs.com/docs/introduction"
 ```
 
-**Read a Single Page Application (SPA):**
+**Read a Single Page Application (SPA) (JS enabled by default):**
 ```bash
-skills/web-browser/scripts/browse.py "https://example.com/spa-app" --js
+skills/web-browser/scripts/browse.py "https://example.com/spa-app"
+```
+
+**Read a static site (faster, no JS):**
+```bash
+skills/web-browser/scripts/browse.py "https://example.com/static" --no-js
 ```
 
 **Take a screenshot:**

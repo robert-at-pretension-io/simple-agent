@@ -57,3 +57,5 @@
 - Added 'screenshot' capability to 'web-browser' skill using ScrapingBee API.
 - Refactored 'vision' skill: 'analyze.py' now saves output to file by default and prints image metadata (size, dims) to stdout. Added Pillow dependency.
 - Updated 'vision' skill: 'analyze.py' now generates a unique random filename for output if not specified.
+- Released v1.1.40: Screenshot skill, Vision enhancements, and updated docs.
+- Updated 'web-browser' skill: 'browse.py' now enables JavaScript rendering by default. Added '--no-js' flag to disable it.

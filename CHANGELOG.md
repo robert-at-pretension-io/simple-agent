@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.41]
+
+### Changed
+- **Web Browser**: `browse.py` now enables JavaScript rendering by default. Added `--no-js` flag to disable it.
+
 ## [v1.1.40]
 
 ### Added

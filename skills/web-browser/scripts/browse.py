@@ -13,7 +13,7 @@ if os.path.exists(venv_python) and sys.executable != venv_python:
 import requests
 from bs4 import BeautifulSoup
 
-def browse_url(url, render_js=False):
+def browse_url(url, render_js=True):
     api_key = os.environ.get("SCRAPINGBEE_API_KEY")
     if not api_key:
         print("Error: SCRAPINGBEE_API_KEY environment variable not set.")
@@ -72,10 +72,10 @@ def browse_url(url, render_js=False):
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: browse.py <url> [--js]")
+        print("Usage: browse.py <url> [--no-js]")
         sys.exit(1)
     
     target_url = sys.argv[1]
-    render_javascript = "--js" in sys.argv
+    render_javascript = "--no-js" not in sys.argv
     
     browse_url(target_url, render_js=render_javascript)
