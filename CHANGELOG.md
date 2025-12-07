@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.30]
+
+### Added
+- **UX**: The agent now prints its version (e.g., "Simple Agent v1.1.30") immediately on startup. This ensures users always know which version they are running, even before any logs or errors appear.
+
 ## [v1.1.25] - 2025-12-07
 
 ### Improved

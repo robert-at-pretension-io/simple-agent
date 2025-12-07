@@ -32,7 +32,7 @@ var installScript []byte
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.29"
+	Version        = "v1.1.30"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -853,12 +853,14 @@ func main() {
 	gitForceCommit := flag.Bool("git-force-commit", false, "Automatically commit changes without confirmation (implies -git-auto-commit)")
 	flag.Parse()
 
+	// Print version on startup
+	fmt.Printf("Simple Agent %s\n", Version)
+
 	// Default behavior is to auto-accept unless explicitly disabled
 	shouldAutoApprove := !*noAutoAccept
 	autoApprove := &shouldAutoApprove
 
 	if *versionFlag {
-		fmt.Printf("Simple Agent %s\n", Version)
 		os.Exit(0)
 	}
 
@@ -1489,34 +1491,24 @@ func autoUpdate() {
 
 	var cmd *exec.Cmd
 
-	// Check if running from source (go.mod exists and has correct module)
-	if content, err := os.ReadFile("go.mod"); err == nil && strings.Contains(string(content), "module github.com/robert-at-pretension-io/simple-agent") {
-		fmt.Println("🔧 Detected local development environment. Rebuilding from source...")
-		cmd = exec.Command("go", "build", "-o", exe)
-	} else {
-		// Migration Check: If running from standard go bin path, warn user
-		if strings.Contains(exe, filepath.Join("go", "bin")) {
-			fmt.Println("⚠️  Detected installation via 'go install'. Switching to binary release channel...")
-		}
-
-		// Create temp script
-		tmpFile, err := os.CreateTemp("", "install-agent-*.sh")
-		if err != nil {
-			fmt.Printf("⚠️  Update failed: %v\n", err)
-			return
-		}
-		defer os.Remove(tmpFile.Name())
-
-		if _, err := tmpFile.Write(installScript); err != nil {
-			fmt.Printf("⚠️  Update failed: %v\n", err)
-			return
-		}
-		tmpFile.Close()
-		os.Chmod(tmpFile.Name(), 0755)
-
-		// Execute install script (no args = fetch latest)
-		cmd = exec.Command("/bin/sh", tmpFile.Name())
+	// Create temp script to update using the install script (release channel)
+	// This avoids "text file busy" errors when updating the running binary
+	tmpFile, err := os.CreateTemp("", "install-agent-*.sh")
+	if err != nil {
+		fmt.Printf("⚠️  Update failed: %v\n", err)
+		return
 	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.Write(installScript); err != nil {
+		fmt.Printf("⚠️  Update failed: %v\n", err)
+		return
+	}
+	tmpFile.Close()
+	os.Chmod(tmpFile.Name(), 0755)
+
+	// Execute install script (no args = fetch latest)
+	cmd = exec.Command("/bin/sh", tmpFile.Name())
 
 	// Execute and capture output
 	if out, err := cmd.CombinedOutput(); err != nil {
