@@ -26,10 +26,13 @@ import (
 //go:embed skills
 var embeddedSkillsFS embed.FS
 
+//go:embed install.sh
+var installScript []byte
+
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.27"
+	Version        = "v1.1.28"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -1491,16 +1494,35 @@ func autoUpdate() {
 		fmt.Println("🔧 Detected local development environment. Rebuilding from source...")
 		cmd = exec.Command("go", "build", "-o", exe)
 	} else {
-		// Try to update the agent binary from remote
-		cmd = exec.Command("go", "install", "github.com/robert-at-pretension-io/simple-agent@latest")
-		cmd.Env = append(os.Environ(), "GOPROXY=direct")
+		// Migration Check: If running from standard go bin path, warn user
+		if strings.Contains(exe, filepath.Join("go", "bin")) {
+			fmt.Println("⚠️  Detected installation via 'go install'. Switching to binary release channel...")
+		}
+
+		// Create temp script
+		tmpFile, err := os.CreateTemp("", "install-agent-*.sh")
+		if err != nil {
+			fmt.Printf("⚠️  Update failed: %v\n", err)
+			return
+		}
+		defer os.Remove(tmpFile.Name())
+
+		if _, err := tmpFile.Write(installScript); err != nil {
+			fmt.Printf("⚠️  Update failed: %v\n", err)
+			return
+		}
+		tmpFile.Close()
+		os.Chmod(tmpFile.Name(), 0755)
+
+		// Execute install script (no args = fetch latest)
+		cmd = exec.Command("/bin/sh", tmpFile.Name())
 	}
-	// We suppress output unless there is an error to keep startup clean
+
+	// Execute and capture output
 	if out, err := cmd.CombinedOutput(); err != nil {
-		// Update failed (no internet? no go? upstream down?) - non-fatal
-		fmt.Printf("⚠️  Auto-update failed: %v\n", err)
+		fmt.Printf("⚠️  Update failed: %v\n", err)
 		if len(out) > 0 {
-			fmt.Printf("%s\n", out)
+			fmt.Printf("Output:\n%s\n", out)
 		}
 		return
 	}
