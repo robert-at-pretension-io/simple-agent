@@ -40,6 +40,13 @@ def browse_url(url, render_js=True):
         for script in soup(["script", "style", "nav", "footer", "header", "aside", "noscript", "iframe", "ad", "meta", "link"]):
             script.extract()
 
+        # Format links as [text](url) to preserve them in text output
+        for a in soup.find_all('a', href=True):
+            link_text = a.get_text(strip=True)
+            link_url = a['href']
+            if link_text:
+                a.replace_with(f" [{link_text}]({link_url}) ")
+
         # Get title
         title = soup.title.string if soup.title else "No Title"
 

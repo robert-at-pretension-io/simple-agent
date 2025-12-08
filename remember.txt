@@ -66,3 +66,5 @@
 - Released v1.1.43: Vision skill now supports custom '--image-model'.
 - Verified Skill Discovery Architecture: Agent automatically loads local skills from './skills' and baked-in skills from '~/.simple_agent/core_skills'. Local skills override core skills.
 - Updated 'vision' skill: Default model is now 'gemini-3-pro-preview'.
+- Released v1.1.44: Vision default model is now Gemini 3 Pro Preview.
+- Updated 'web-browser' skill: 'browse.py' now includes links in the output formatted as '[text](url)'.

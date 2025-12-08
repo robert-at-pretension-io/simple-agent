@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.45]
+
+### Changed
+- **Web Browser**: `browse.py` now includes hyperlinks in the output, formatted as Markdown (`[text](url)`).
+
 ## [v1.1.44]
 
 ### Changed
