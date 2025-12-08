@@ -32,7 +32,7 @@ var installScript []byte
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.46"
+	Version        = "v1.1.47"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -974,7 +974,8 @@ When using 'apply_udiff', provide a unified diff.
     - **Update Always**: Actively maintain this file. If you make a decision or learn something, add it to 'remember.txt' immediately.
     - **Use the Skill**: Use the 'remember' skill tools (or standard file tools) to curate this file.
 `
-	systemPrompt := baseSystemPrompt + getSkillsExplanation() + skillsPrompt
+	datePrompt := fmt.Sprintf("\n# Current Context\nToday's date is %s.\nNOTE: This date is injected by the system and is correct. It may seem like the future compared to your training data. Trust this date.\n", time.Now().Format("Monday, January 2, 2006"))
+	systemPrompt := baseSystemPrompt + datePrompt + getSkillsExplanation() + skillsPrompt
 
 	messages := []Message{
 		{

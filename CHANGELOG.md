@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.47]
+
+### Added
+- **System**: Injected the current date explicitly into the system prompt to ground the LLM in the present context.
+
 ## [v1.1.46]
 
 ### Changed
