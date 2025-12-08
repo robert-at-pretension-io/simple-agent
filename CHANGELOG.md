@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.46]
+
+### Changed
+- **Web Browser**: Switched search backend from Brave Search to SerpApi. Supports `SERPAPI_API_KEY` (preferred) or `SERPAPI_KEY`.
+
 ## [v1.1.45]
 
 ### Changed

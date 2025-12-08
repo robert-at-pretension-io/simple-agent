@@ -5,7 +5,7 @@ description: Search the web and browse/scrape web pages to extract text content.
 
 # Web Browser Skill
 
-This skill provides capabilities to search the web using Brave Search and browse/scrape web pages using ScrapingBee. It is designed to extract readable text content from websites, filtering out boilerplate and code.
+This skill provides capabilities to search the web using SerpApi and browse/scrape web pages using ScrapingBee. It is designed to extract readable text content from websites, filtering out boilerplate and code.
 
 ## Capabilities
 
@@ -17,7 +17,7 @@ This skill provides capabilities to search the web using Brave Search and browse
 
 This skill requires the following environment variables to be set (typically in `~/.bashrc`):
 
-- `BRAVE_SEARCH_API_KEY`: For search functionality.
+- `SERPAPI_API_KEY`: For search functionality.
 - `SCRAPINGBEE_API_KEY`: For browsing/scraping functionality.
 
 Dependencies:

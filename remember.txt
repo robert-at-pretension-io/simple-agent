@@ -68,3 +68,5 @@
 - Updated 'vision' skill: Default model is now 'gemini-3-pro-preview'.
 - Released v1.1.44: Vision default model is now Gemini 3 Pro Preview.
 - Updated 'web-browser' skill: 'browse.py' now includes links in the output formatted as '[text](url)'.
+- Released v1.1.45: Web Browser now extracts links.
+- Updated 'web-browser' skill: Switched search backend from Brave to SerpApi. Supports 'SERPAPI_API_KEY' or 'SERPAPI_KEY'.
