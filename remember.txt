@@ -71,3 +71,4 @@
 - Released v1.1.45: Web Browser now extracts links.
 - Updated 'web-browser' skill: Switched search backend from Brave to SerpApi. Supports 'SERPAPI_API_KEY' or 'SERPAPI_KEY'.
 - Released v1.1.46: Web Browser now uses SerpApi for search.
+- Released v1.1.47: System prompt now includes the current date.

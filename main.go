@@ -32,7 +32,7 @@ var installScript []byte
 var CoreSkillsDir string
 
 const (
-	Version        = "v1.1.47"
+	Version        = "v1.1.48"
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
@@ -267,6 +267,8 @@ func discoverSkills(root string) []Skill {
 			skill, err := parseSkill(path)
 			if err == nil {
 				skills = append(skills, skill)
+			} else {
+				fmt.Fprintf(os.Stderr, "Warning: Failed to load skill at %s: %v\n", path, err)
 			}
 		}
 		return nil

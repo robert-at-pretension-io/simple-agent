@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.48]
+
+### Fixed
+- **System**: Added warning logging to `stderr` when a skill fails to load (e.g., due to invalid YAML in `SKILL.md`). Previously, these were silently ignored.
+
 ## [v1.1.47]
 
 ### Added
