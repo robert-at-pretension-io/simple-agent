@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.44]
+
+### Changed
+- **Vision**: Updated default image analysis model to `gemini-3-pro-preview`.
+
 ## [v1.1.43]
 
 ### Added

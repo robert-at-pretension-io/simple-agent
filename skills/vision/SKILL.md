@@ -20,7 +20,7 @@ args:
   - "--output"
   - "/path/to/output.txt" (Optional, defaults to random filename)
   - "--image-model"
-  - "gemini-2.5-flash" (Optional, default: gemini-2.5-flash)
+  - "gemini-3-pro-preview" (Optional, default: gemini-3-pro-preview)
   - "--prompt"
   - "Describe what you see in this image." (Optional)
 
@@ -34,6 +34,6 @@ args:
 
 ## Notes
 - Supports JPEG, PNG, WEBP, HEIC, HEIF.
-- Uses Gemini 2.5 Flash model by default (configurable via --image-model) via OpenAI compatibility layer.
+- Uses Gemini 3 Pro Preview model by default (configurable via --image-model) via OpenAI compatibility layer.
 - Saves analysis to a text file and prints image metadata to stdout.
 - Requires GEMINI_API_KEY environment variable.

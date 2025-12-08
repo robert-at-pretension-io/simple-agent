@@ -30,7 +30,7 @@ def main():
     parser = argparse.ArgumentParser(description="Analyze images using Gemini via OpenAI compatibility.")
     parser.add_argument("--image", required=True, help="Path to local image file or URL.")
     parser.add_argument("--output", help="Path to save the analysis output text.")
-    parser.add_argument("--image-model", default="gemini-2.5-flash", help="Model to use for image analysis.")
+    parser.add_argument("--image-model", default="gemini-3-pro-preview", help="Model to use for image analysis.")
     parser.add_argument("--prompt", default="Describe this image in detail.", help="Prompt for the model.")
     args = parser.parse_args()
 
