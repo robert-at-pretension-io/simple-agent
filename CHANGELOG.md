@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.50]
+
+### Changed
+- **Config**: Updated default OpenAI model from `gpt-4o` to `gpt-5.2` in `main.go`.
+
 ## [v1.1.49]
 
 ### Added

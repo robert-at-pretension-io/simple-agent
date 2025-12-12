@@ -80,3 +80,5 @@
 - Released v1.1.46: Web Browser now uses SerpApi for search.
 - Released v1.1.47: System prompt now includes the current date.
 - Released v1.1.48: Agent now warns when skills fail to load.
+- Released v1.1.49: Added CLI flag `-model` to switch between Gemini and OpenAI.
+- Released v1.1.50: Updated OpenAI default model to `gpt-5.2`.
