@@ -31,11 +31,17 @@ var installScript []byte
 
 var CoreSkillsDir string
 
-const (
-	Version        = "v1.1.48"
+const Version = "v1.1.49"
+
+var (
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
 	FlashModelName = "gemini-2.5-flash"
+)
+
+const (
+	OpenAIURL       = "https://api.openai.com/v1/chat/completions"
+	OpenAIModelName = "gpt-4o"
 )
 
 // --- API Structures ---
@@ -853,6 +859,7 @@ func main() {
 	continueSession := flag.Bool("continue", false, "Continue from previous session history")
 	gitAutoCommit := flag.Bool("git-auto-commit", false, "Automatically propose commits for file changes after every turn")
 	gitForceCommit := flag.Bool("git-force-commit", false, "Automatically commit changes without confirmation (implies -git-auto-commit)")
+	modelFlag := flag.String("model", "gemini", "Select model: gemini (default) or openai")
 	flag.Parse()
 
 	// Print version on startup
@@ -870,9 +877,27 @@ func main() {
 		autoUpdate()
 	}
 
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		fmt.Println("Please set GEMINI_API_KEY environment variable.")
+	var apiKey string
+
+	switch *modelFlag {
+	case "openai":
+		GeminiURL = OpenAIURL
+		ModelName = OpenAIModelName
+		FlashModelName = OpenAIModelName
+		apiKey = os.Getenv("OPENAI_API_KEY")
+		if apiKey == "" {
+			fmt.Println("Please set OPENAI_API_KEY environment variable.")
+			os.Exit(1)
+		}
+	case "gemini":
+		// Globals are already set to Gemini defaults
+		apiKey = os.Getenv("GEMINI_API_KEY")
+		if apiKey == "" {
+			fmt.Println("Please set GEMINI_API_KEY environment variable.")
+			os.Exit(1)
+		}
+	default:
+		fmt.Printf("Unknown model: %s. usage: -model gemini|openai\n", *modelFlag)
 		os.Exit(1)
 	}
 
@@ -1069,11 +1094,16 @@ When using 'apply_udiff', provide a unified diff.
 				break
 			}
 
+			var extraBody json.RawMessage
+			if *modelFlag == "gemini" {
+				extraBody = json.RawMessage(`{"google": {"thinking_config": {"include_thoughts": true}}}`)
+			}
+
 			reqBody := ChatCompletionRequest{
 				Model:     ModelName,
 				Messages:  messages,
 				Tools:     []Tool{udiffTool, runScriptTool, shortenContextTool},
-				ExtraBody: json.RawMessage(`{"google": {"thinking_config": {"include_thoughts": true}}}`),
+				ExtraBody: extraBody,
 			}
 
 			jsonData, err := json.Marshal(reqBody)

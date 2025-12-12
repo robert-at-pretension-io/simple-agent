@@ -26,6 +26,13 @@
   - *Solution*: Created `setup_hooks.sh` to install a git pre-commit hook that runs `go build` automatically.
   - *Lesson*: **ALWAYS build locally before pushing.** Run `./setup_hooks.sh` in new environments to prevent regression.
 
+- **Model Toggle (Gemini/OpenAI)**:
+  - *Feature*: Added support for switching between Gemini and OpenAI models via CLI.
+  - *Usage*: `simple-agent -model openai` (defaults to `gemini`).
+  - *Architecture*: Refactored `GeminiURL` and `ModelName` from `const` to global `var` in `main.go`. This allows `main()` to overwrite them based on the flag, avoiding massive find-and-replace refactoring.
+  - *Dependencies*: OpenAI mode requires `OPENAI_API_KEY`. Gemini specific features (like `thinking_config`) are conditionally applied.
+  - *Lesson*: When supporting multiple backends, using global configuration variables that are set once at startup is cleaner than passing config objects through every function call.
+
 ## Git & Release Workflow
 **CRITICAL**: ALWAYS autonomously commit code changes, push to git remote, AND tag them with the current version. Users rely on git tags to receive updates.
 
@@ -72,3 +79,4 @@
 - Updated 'web-browser' skill: Switched search backend from Brave to SerpApi. Supports 'SERPAPI_API_KEY' or 'SERPAPI_KEY'.
 - Released v1.1.46: Web Browser now uses SerpApi for search.
 - Released v1.1.47: System prompt now includes the current date.
+- Released v1.1.48: Agent now warns when skills fail to load.

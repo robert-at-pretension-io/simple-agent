@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.49]
+
+### Added
+- **Model Toggle**: Added `-model` flag to switch between `gemini` (default) and `openai`.
+- **Refactor**: Changed `GeminiURL` and `ModelName` from constants to global variables in `main.go` to support runtime configuration.
+- **OpenAI Support**: Added `OpenAIURL` and `OpenAIModelName` (`gpt-4o`) constants.
+
 ## [v1.1.48]
 
 ### Fixed
