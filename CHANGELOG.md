@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.50]
+
+### Added
+- **Skills**: Added `pdf-ocr` skill for extracting text from PDF documents using Gemini's vision capabilities. Includes support for context-aware processing and smart caching.
+
 ## [v1.1.49]
 
 ### Added

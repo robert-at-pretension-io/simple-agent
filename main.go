@@ -31,7 +31,7 @@ var installScript []byte
 
 var CoreSkillsDir string
 
-const Version = "v1.1.49"
+const Version = "v1.1.50"
 
 var (
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
