@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.54]
+- **Stability**: Reverted `Version` in `main.go` from `var` to `const` to resolve potential stability issues with builds.
+- **Maintenance**: Manually bumped version to v1.1.54 in source code (since `ldflags` cannot modify constants).
+
 ## [v1.1.53]
 - **Fix**: Changed `Version` constant to a variable in `main.go` to fix `ldflags` injection. This resolves the issue where binaries reported the wrong version, causing infinite update loops.
 - **System**: Bumped version to v1.1.53.
