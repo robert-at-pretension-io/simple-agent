@@ -677,12 +677,14 @@ Environment Variables:
     # Initialize logger
     logger = Logger(log_file=args.log_file if not (args.clear_cache or args.clear_all_cache) else None)
 
-    # Check for API key
-    api_key = os.environ.get('GEMINI_API_KEY')
+    # Check for API key (try multiple common environment variables)
+    api_key = os.environ.get('GEMINI_API_KEY') or os.environ.get('API_KEY') or os.environ.get('OPENAI_API_KEY')
     if not api_key and not (args.clear_cache or args.clear_all_cache):
-        logger.log(f"{Colors.RED}Error: GEMINI_API_KEY environment variable is not set{Colors.NC}")
-        logger.log("Please set your Gemini API Key:")
-        logger.log("  export GEMINI_API_KEY='your-api-key-here'")
+        logger.log(f"{Colors.RED}Error: No API key found in environment variables{Colors.NC}")
+        logger.log("Please set one of the following environment variables:")
+        logger.log("  export GEMINI_API_KEY='your-key'")
+        logger.log("  export API_KEY='your-key'")
+        logger.log("  export OPENAI_API_KEY='your-key'")
         logger.close()
         sys.exit(1)
 

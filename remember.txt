@@ -2,7 +2,7 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.39
+- **Current Version**: v1.1.50
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
@@ -21,17 +21,13 @@
   - *Solution*: Modified `runSafeScript` in `main.go` to check output length. Outputs > 50,000 characters are now automatically saved to a file in `.simple_agent/outputs/`, and the agent receives a pointer to that file instead of the raw data.
   - *Lesson*: Always bound tool outputs. The LLM context window is finite; file-based offloading is a robust fallback for "firehose" data.
 
-- **Build Safety**:
-  - *Problem*: Pushed code with a compile error (unused variable) which broke the CI/CD pipeline for v1.1.34.
+-  - *Problem*: Pushed code with a compile error (unused variable) which broke the CI/CD pipeline for v1.1.34.
   - *Solution*: Created `setup_hooks.sh` to install a git pre-commit hook that runs `go build` automatically.
   - *Lesson*: **ALWAYS build locally before pushing.** Run `./setup_hooks.sh` in new environments to prevent regression.
 
-- **Model Toggle (Gemini/OpenAI)**:
-  - *Feature*: Added support for switching between Gemini and OpenAI models via CLI.
-  - *Usage*: `simple-agent -model openai` (defaults to `gemini`).
-  - *Architecture*: Refactored `GeminiURL` and `ModelName` from `const` to global `var` in `main.go`. This allows `main()` to overwrite them based on the flag, avoiding massive find-and-replace refactoring.
-  - *Dependencies*: OpenAI mode requires `OPENAI_API_KEY`. Gemini specific features (like `thinking_config`) are conditionally applied.
-  - *Lesson*: When supporting multiple backends, using global configuration variables that are set once at startup is cleaner than passing config objects through every function call.
+- **Temporary Scripts**:
+  - **CRITICAL**: Always place temporary scripts or scratch files in a `temp/` directory. 
+  - This directory is in `.gitignore` to keep the workspace clean and protect sensitive data (like router/ssh passwords used in automation).
 
 ## Git & Release Workflow
 **CRITICAL**: ALWAYS autonomously commit code changes, push to git remote, AND tag them with the current version. Users rely on git tags to receive updates.
@@ -79,4 +75,22 @@
 - Updated 'web-browser' skill: Switched search backend from Brave to SerpApi. Supports 'SERPAPI_API_KEY' or 'SERPAPI_KEY'.
 - Released v1.1.46: Web Browser now uses SerpApi for search.
 - Released v1.1.47: System prompt now includes the current date.
-- Released v1.1.48: Agent now warns when skills fail to load.
+- Released v1.1.48: Fixed: Log warning when skill loading fails to improve debuggability.
+- Released v1.1.49: Added support for switching between Gemini and OpenAI models via `-model` flag.
+- Released v1.1.50: Added 'pdf-ocr' skill (AI-powered OCR for PDF documents). Updated documentation.
+**Note**: 'todo-manager' skill was removed by the user on 2025-12-17.
+### Networking & WiFi Diagnosis (Dec 2025)
+
+**The Problem**: WiFi was down for all clients. Diagnosis revealed:
+- The **Pi-hole (192.168.0.18)** was the DHCP-assigned gateway for WiFi clients.
+- The Pi-hole was running **Mullvad VPN (WireGuard)**, which had stalled or was black-holing traffic.
+- The Pi-hole lacked **IPTables MASQUERADE** rules for its physical interface (`eth0`), preventing it from routing traffic from WiFi clients to the main router once the VPN was disabled.
+- The Pi-hole's internal DNS (`/etc/resolv.conf`) was pointing to non-functional VPN DNS servers.
+
+**The Solution**:
+1. SSH'd into the Pi-hole using `pexpect` for automation.
+2. Brought down the VPN: `sudo wg-quick down mullvad`.
+3. Manually added NAT MASQUERADE: `sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE`.
+4. Enabled IP forwarding: `sudo sysctl -w net.ipv4.ip_forward=1`.
+5. Updated upstream DNS to `8.8.8.8` in `/etc/resolv.conf` and reloaded Pi-hole DNS.
+6. Result: WiFi connectivity restored with 0% packet loss.

@@ -24,8 +24,11 @@ Before using this skill, ensure the following are set up:
     - macOS: `brew install poppler`
 2.  **Python Packages**: `openai`
     - `pip install openai`
-3.  **Environment Variable**: `GEMINI_API_KEY`
-    - `export GEMINI_API_KEY='your_api_key'`
+3.  **Environment Variable**: One of the following must be set:
+    - `GEMINI_API_KEY`: Primary choice for this skill.
+    - `API_KEY`: Standard variable used by the agent for Gemini.
+    - `OPENAI_API_KEY`: Fallback if using Gemini through an OpenAI-compatible endpoint.
+    - Example: `export API_KEY='your_api_key'`
 
 ## Usage
 

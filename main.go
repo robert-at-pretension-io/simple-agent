@@ -31,12 +31,12 @@ var installScript []byte
 
 var CoreSkillsDir string
 
-const Version = "v1.1.50"
+const Version = "v1.1.51"
 
 var (
 	GeminiURL      = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 	ModelName      = "gemini-3-pro-preview"
-	FlashModelName = "gemini-2.5-flash"
+	FlashModelName = "gemini-3-flash-preview"
 )
 
 const (
@@ -153,7 +153,6 @@ var runScriptTool = Tool{
 		}`),
 	},
 }
-
 
 var shortenContextTool = Tool{
 	Type: "function",
@@ -1302,7 +1301,6 @@ When using 'apply_udiff', provide a unified diff.
 							}
 						}
 
-
 					case "run_script":
 						fmt.Printf("\n\033[1;35m🛠  Tool Call: run_script\033[0m\n")
 						var args struct {
@@ -1327,7 +1325,6 @@ When using 'apply_udiff', provide a unified diff.
 								toolResult += "\n\n[Hook Output]\n" + hookOut
 							}
 						}
-
 
 					case "shorten_context":
 						fmt.Printf("\n\033[1;35m🛠  Tool Call: shorten_context\033[0m\n")
@@ -1553,10 +1550,18 @@ func isNewer(current, latest string) bool {
 
 	for i := 0; i < maxLen; i++ {
 		vC, vL := 0, 0
-		if i < lenC { vC = c[i] }
-		if i < lenL { vL = l[i] }
-		if vL > vC { return true }
-		if vL < vC { return false }
+		if i < lenC {
+			vC = c[i]
+		}
+		if i < lenL {
+			vL = l[i]
+		}
+		if vL > vC {
+			return true
+		}
+		if vL < vC {
+			return false
+		}
 	}
 	return false
 }
@@ -1629,7 +1634,6 @@ func autoUpdate() {
 		fmt.Println("✅ Fallback update complete via 'go install'. Please restart.")
 		os.Exit(0)
 	}
-
 
 	// Check if binary was updated
 	if infoAfter, err := os.Stat(exe); err == nil {
@@ -1742,7 +1746,6 @@ func validatePath(path string) (string, error) {
 
 	return absPath, nil
 }
-
 
 func parseArgs(command string) ([]string, error) {
 	var args []string
@@ -1860,10 +1863,10 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 		if homeErr == nil {
 			outputDir := filepath.Join(home, ".simple_agent", "outputs")
 			_ = os.MkdirAll(outputDir, 0755)
-			
+
 			filename := fmt.Sprintf("output_%d.txt", time.Now().UnixNano())
 			filePath := filepath.Join(outputDir, filename)
-			
+
 			if writeErr := os.WriteFile(filePath, out, 0644); writeErr == nil {
 				output = fmt.Sprintf("Output too large (%d chars). Saved to %s\nRead this file to see the results.", len(output), filePath)
 			}
@@ -1875,7 +1878,6 @@ func runSafeScript(ctx context.Context, scriptPath string, args []string, skills
 	}
 	return output, nil
 }
-
 
 // applyUDiff applies a unified diff to a file
 func applyUDiff(ctx context.Context, path string, diff string, dryRun bool) (string, error) {

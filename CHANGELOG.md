@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.51]
+
+### Changed
+- **Skills**: Updated `pdf-ocr` skill to support `API_KEY` and `OPENAI_API_KEY` as fallbacks for `GEMINI_API_KEY`.
+- **System**: Updated default Flash model to `gemini-3-flash-preview` in `main.go`.
+- **System**: Minor code cleanup and formatting in `main.go`.
+
+### Removed
+- **Skills**: Removed `todo-manager` skill (deprecated).
+
 ## [v1.1.50]
 
 ### Added
