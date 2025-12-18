@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.53]
+- **Fix**: Changed `Version` constant to a variable in `main.go` to fix `ldflags` injection. This resolves the issue where binaries reported the wrong version, causing infinite update loops.
+- **System**: Bumped version to v1.1.53.
+
 ## [v1.1.52]
 - Revert release workflow to single-job matrix strategy to fix regression.
 - CI now runs build and release in the same job for each platform.
