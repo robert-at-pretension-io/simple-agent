@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v1.1.52]
+- Revert release workflow to single-job matrix strategy to fix regression.
+- CI now runs build and release in the same job for each platform.
+
 ## [v1.1.51]
 
 ### Changed
