@@ -2,11 +2,16 @@
 
 ## System Configuration
 - **Project**: Simple Agent (Go)
-- **Current Version**: v1.1.50
+- **Current Version**: v1.1.54
 - **Build**: `go build main.go`
 
 ## Key Decisions & Lessons Learned
 - **System Prompt & Diffing**: 
+  - *Problem*: Infinite update loop where the agent downloaded the new binary but still reported the old version.
+  - *Cause*: `Version` was defined as a `const` in `main.go`. Go's `ldflags -X` cannot modify constants, so the GitHub Action failed to inject the git tag version, leaving the binary with the hardcoded old version.
+  - *Solution*: Changed `Version` to a `var` in `main.go`.
+  - *Lesson*: **ALWAYS define build-time variables as `var`, not `const`.**
+
   - *Problem*: Agents often fail to apply unified diffs because they provide insufficient or mismatched context lines.
   - *Solution*: The system prompt (in `main.go`) now includes a specific "How to Include Context" section with 4 explicit steps (Identify, Copy, Prefix, Combine).
   - *Lesson*: Be extremely explicit about format requirements in the system prompt. Don't just say "include context", explain *how* to construct the block.
@@ -78,7 +83,7 @@
 - Released v1.1.48: Fixed: Log warning when skill loading fails to improve debuggability.
 - Released v1.1.49: Added support for switching between Gemini and OpenAI models via `-model` flag.
 - Released v1.1.50: Added 'pdf-ocr' skill (AI-powered OCR for PDF documents). Updated documentation.
-**Note**: 'todo-manager' skill was removed by the user on 2025-12-17.
+- Released v1.1.51: Removed 'todo-manager' skill. Updated 'pdf-ocr' to support fallback API keys. Updated default Flash model to 'gemini-3-flash-preview'.
 ### Networking & WiFi Diagnosis (Dec 2025)
 
 **The Problem**: WiFi was down for all clients. Diagnosis revealed:
@@ -94,3 +99,5 @@
 4. Enabled IP forwarding: `sudo sysctl -w net.ipv4.ip_forward=1`.
 5. Updated upstream DNS to `8.8.8.8` in `/etc/resolv.conf` and reloaded Pi-hole DNS.
 6. Result: WiFi connectivity restored with 0% packet loss.
+- Thu Dec 18 09:29:24 AM EST 2025: Reverted Version to 'const' in main.go to ensure stability. Manually updated Version to v1.1.53 in source. Note: ldflags -X does not work on const, so source must be updated before tagging.
+- Thu Dec 18 10:15:00 AM EST 2025: Re-applied the "Split Build/Release" workflow strategy (v1.1.38 style) to `.github/workflows/release.yml`. The previous revert (v1.1.53) re-introduced a race condition where concurrent matrix jobs tried to create the release simultaneously, causing "stuck in draft" states and missing artifacts (404s).
